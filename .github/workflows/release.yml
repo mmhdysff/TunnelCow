@@ -42,20 +42,25 @@ jobs:
           echo "New version: $NEW_TAG"
           echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
-      - name: Update README Version Badge
+      - name: Update Version Strings
         run: |
-          # Replace version-X.X.X-blue with new version
-          sed -i "s/version-[0-9]*\.[0-9]*\.[0-9]*-blue/version-${{ steps.version.outputs.tag }}-blue/" README.md
+          # Update README badge (handle optional 'v' prefix in regex)
+          sed -i "s/version-v\?[0-9]*\.[0-9]*\.[0-9]*-blue/version-${{ steps.version.outputs.tag }}-blue/" README.md
           
-          # Verify change
-          grep "version-${{ steps.version.outputs.tag }}-blue" README.md || echo "Warning: README badge not updated or not found"
+          # Update App.jsx version display
+          sed -i "s/v[0-9]*\.[0-9]*\.[0-9]*/${{ steps.version.outputs.tag }}/" web/src/App.jsx
+          
+          # Verify changes
+          grep "version-${{ steps.version.outputs.tag }}-blue" README.md || echo "Warning: README badge not updated"
+          grep "${{ steps.version.outputs.tag }}" web/src/App.jsx || echo "Warning: App.jsx version not updated"
 
       - name: Commit and Push Changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add README.md
+          
+          git add README.md web/src/App.jsx
           
           # Only commit if there are changes
           if ! git diff --staged --quiet; then
