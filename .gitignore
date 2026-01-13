@@ -3,10 +3,10 @@
 *.dll
 *.so
 *.dylib
-tunnelcow-client
-tunnelcow-server
-tunnelcow-client-linux
-tunnelcow-server-linux
+/tunnelcow-client
+/tunnelcow-server
+/tunnelcow-client-linux
+/tunnelcow-server-linux
 
 # Logs
 *.log
