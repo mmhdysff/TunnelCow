@@ -34,3 +34,21 @@ type ReqDomainMapPayload struct {
 type ReqDomainUnmapPayload struct {
 	Domain string `json:"domain"`
 }
+
+const (
+	MsgTypeInspectData = "INSPECT_DATA"
+)
+
+type InspectPayload struct {
+	ID         string            `json:"id"`
+	Timestamp  int64             `json:"timestamp"`
+	Method     string            `json:"method"`
+	URL        string            `json:"url"`
+	ReqHeaders map[string]string `json:"req_headers"`
+	ReqBody    string            `json:"req_body"`
+	Status     int               `json:"status"`
+	ResHeaders map[string]string `json:"res_headers"`
+	ResBody    string            `json:"res_body"`
+	DurationMs int64             `json:"duration_ms"`
+	ClientIP   string            `json:"client_ip"`
+}

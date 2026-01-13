@@ -28,6 +28,7 @@ func startAPIServer() {
 	mux.Handle("/api/status", authMiddleware(http.HandlerFunc(api.handleStatus)))
 	mux.Handle("/api/tunnels", authMiddleware(http.HandlerFunc(api.handleTunnels)))
 	mux.Handle("/api/domains", authMiddleware(http.HandlerFunc(api.handleDomains)))
+	mux.Handle("/api/inspect", authMiddleware(http.HandlerFunc(api.handleInspect)))
 
 	addr := fmt.Sprintf(":%d", tunnel.DefaultDashboardPort)
 	log.Printf("Dashboard API listening on %s", addr)
@@ -225,4 +226,16 @@ func (s *APIServer) handleDomains(w http.ResponseWriter, r *http.Request) {
 		}
 		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 	}
+}
+
+func (s *APIServer) handleInspect(w http.ResponseWriter, r *http.Request) {
+	InspectLogsMu.RLock()
+	defer InspectLogsMu.RUnlock()
+
+	logs := InspectLogs[0]
+	if logs == nil {
+		logs = []tunnel.InspectPayload{}
+	}
+
+	json.NewEncoder(w).Encode(logs)
 }

@@ -1,22 +1,26 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strings"
+	"time"
 	"tunnelcow/internal/tunnel"
 
+	"math/rand"
+
+	"github.com/google/uuid"
 	"github.com/hashicorp/yamux"
 	"golang.org/x/crypto/acme/autocert"
-
-	"math/rand"
-	"time"
 )
 
 var Version = "dev"
@@ -36,18 +40,15 @@ func main() {
 	var serverCfg ServerConfig
 	configPath := "data/server_config.json"
 
-	// Load Config
 	if data, err := os.ReadFile(configPath); err == nil {
 		json.Unmarshal(data, &serverCfg)
 	}
 
-	// Determine Final Values
 	finalToken := *tokenFlag
 	if finalToken == "" {
 		finalToken = serverCfg.Token
 	}
 
-	// Auto-Generate Token if missing
 	if finalToken == "" {
 		rand.Seed(time.Now().UnixNano())
 		b := make([]byte, 16)
@@ -55,7 +56,6 @@ func main() {
 		finalToken = fmt.Sprintf("%x", b)
 		fmt.Printf("Notice: No token provided. Generated one: %s\n", finalToken)
 
-		// Save to config
 		serverCfg.Token = finalToken
 		serverCfg.Port = *portFlag
 		serverCfg.Debug = *debugFlag
@@ -67,16 +67,11 @@ func main() {
 	}
 
 	finalPort := *portFlag
-	// If flag is default OR config has non-zero port, use config?
-	// Usually flags override config.
-	// But if flag is default (64290) and config is different (e.g. 7000), we should probably use config.
-	// But we can't easily detect "flag provided" vs "default" easily with standard flags unless we use Visit.
-	// Let's stick to: If flag is NOT default, use flag. Else use config if valid. Else default.
+
 	if finalPort == tunnel.DefaultControlPort && serverCfg.Port != 0 {
 		finalPort = serverCfg.Port
 	}
 
-	// Debug logic similar
 	finalDebug := *debugFlag
 	if !finalDebug && serverCfg.Debug {
 		finalDebug = true
@@ -152,7 +147,13 @@ func startHTTPSListener() {
 				req.URL.Host = fmt.Sprintf("127.0.0.1:%d", entry.PublicPort)
 				req.Host = host
 			}
-			proxy := &httputil.ReverseProxy{Director: director}
+			proxy := &httputil.ReverseProxy{
+				Director: director,
+				Transport: &CaptureTransport{
+					Base:       http.DefaultTransport,
+					PublicPort: entry.PublicPort,
+				},
+			}
 			proxy.ServeHTTP(w, r)
 		}),
 	}
@@ -176,7 +177,13 @@ func startHTTPSListener() {
 				req.URL.Host = fmt.Sprintf("127.0.0.1:%d", entry.PublicPort)
 				req.Host = host
 			}
-			proxy := &httputil.ReverseProxy{Director: director}
+			proxy := &httputil.ReverseProxy{
+				Director: director,
+				Transport: &CaptureTransport{
+					Base:       http.DefaultTransport,
+					PublicPort: entry.PublicPort,
+				},
+			}
 			proxy.ServeHTTP(w, r)
 		} else {
 
@@ -202,6 +209,85 @@ func startHTTPSListener() {
 	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.Printf("TLS Server failed: %v (Proceeding with Control Server only)", err)
 	}
+}
+
+type CaptureTransport struct {
+	Base       http.RoundTripper
+	PublicPort int
+}
+
+func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+	id := uuid.New().String()
+
+	var reqBody []byte
+	if req.Body != nil {
+		reqBody, _ = io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+	}
+
+	reqHeaders := make(map[string]string)
+	for k, v := range req.Header {
+		reqHeaders[k] = strings.Join(v, ", ")
+	}
+
+	res, err := t.Base.RoundTrip(req)
+
+	duration := time.Since(start).Milliseconds()
+
+	var resBody []byte
+	status := 0
+	resHeaders := make(map[string]string)
+
+	if res != nil {
+		status = res.StatusCode
+		if res.Body != nil {
+			resBody, _ = io.ReadAll(res.Body)
+			res.Body = io.NopCloser(bytes.NewBuffer(resBody))
+		}
+		for k, v := range res.Header {
+			resHeaders[k] = strings.Join(v, ", ")
+		}
+	} else if err != nil {
+		status = 502
+		resBody = []byte(err.Error())
+	}
+
+	payload := tunnel.InspectPayload{
+		ID:         id,
+		Timestamp:  start.UnixMilli(),
+		Method:     req.Method,
+		URL:        req.URL.String(),
+		ReqHeaders: reqHeaders,
+		ReqBody:    string(reqBody),
+		Status:     status,
+		ResHeaders: resHeaders,
+		ResBody:    string(resBody),
+		DurationMs: duration,
+		ClientIP:   req.RemoteAddr,
+	}
+
+	go sendInspectData(t.PublicPort, payload)
+
+	return res, err
+}
+
+func sendInspectData(publicPort int, data tunnel.InspectPayload) {
+	session, ok := globalSessions.Get(publicPort)
+	if !ok {
+		return
+	}
+
+	payloadBytes, _ := json.Marshal(data)
+	msg := tunnel.ControlMessage{
+		Type:    tunnel.MsgTypeInspectData,
+		Payload: payloadBytes,
+	}
+
+	session.Mu.Lock()
+	defer session.Mu.Unlock()
+
+	json.NewEncoder(session.Control).Encode(msg)
 }
 
 func handleClient(conn net.Conn, requiredToken string, controlPort int, debug bool) {

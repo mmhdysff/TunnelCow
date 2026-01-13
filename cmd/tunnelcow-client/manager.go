@@ -344,8 +344,8 @@ func (m *ClientManager) readControlLoop() {
 			return
 		}
 
-		if msg.Type == tunnel.MsgTypePing {
-
+		switch msg.Type {
+		case tunnel.MsgTypePing:
 			var payload map[string]int64
 			if err := json.Unmarshal(msg.Payload, &payload); err == nil {
 				sent := payload["ts"]
@@ -354,6 +354,8 @@ func (m *ClientManager) readControlLoop() {
 				ms := rtt / 1_000_000
 				atomic.StoreInt64(&tunnel.GlobalStats.LatencyMs, ms)
 			}
+		case tunnel.MsgTypeInspectData:
+			m.handleInspectData(msg.Payload)
 		}
 	}
 }
@@ -420,4 +422,27 @@ func (m *ClientManager) handleStream(stream net.Conn) {
 func mustMarshal(v interface{}) json.RawMessage {
 	b, _ := json.Marshal(v)
 	return b
+}
+
+var (
+	InspectLogs   = make(map[int][]tunnel.InspectPayload)
+	InspectLogsMu sync.RWMutex
+)
+
+func (c *ClientManager) handleInspectData(payload json.RawMessage) {
+	var data tunnel.InspectPayload
+	if err := json.Unmarshal(payload, &data); err != nil {
+		log.Printf("Invalid INSPECT_DATA: %v", err)
+		return
+	}
+
+	InspectLogsMu.Lock()
+	defer InspectLogsMu.Unlock()
+
+	list := InspectLogs[0]
+	list = append(list, data)
+	if len(list) > 100 {
+		list = list[len(list)-100:]
+	}
+	InspectLogs[0] = list
 }

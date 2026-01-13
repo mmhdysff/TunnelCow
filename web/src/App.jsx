@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
-import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square } from 'lucide-react';
+import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square, Eye, Search, Code, Clock, LockOpen } from 'lucide-react';
 import clsx from 'clsx';
 import { createPortal } from 'react-dom';
 
@@ -59,6 +59,8 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
+  const [inspectorLogs, setInspectorLogs] = useState([]);
+  const [selectedLogId, setSelectedLogId] = useState(null);
 
 
   const [selectedTunnels, setSelectedTunnels] = useState(new Set());
@@ -73,7 +75,6 @@ function App() {
   const addToast = (message, type = 'error') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => removeToast(id), 5000);
   };
 
   const removeToast = (id) => {
@@ -147,6 +148,14 @@ function App() {
           });
           return { up: payload.stats.bytes_up, down: payload.stats.bytes_down, time: now };
         });
+      }
+
+      if (activeTab === 'inspector') {
+        const iRes = await fetch(`${API_BASE}/inspect`);
+        if (iRes.ok) {
+          const logs = await iRes.json();
+          setInspectorLogs(logs.reverse());
+        }
       }
     } catch (e) {
 
@@ -339,8 +348,8 @@ function App() {
               onChange={e => setPassword(e.target.value)}
               autoFocus
             />
-            <button type="submit" className="w-full bg-white text-black font-bold uppercase py-3 hover:bg-zinc-200 transition-colors rounded-sm">
-              Unlock
+            <button type="submit" className="w-full bg-white text-black font-bold uppercase py-3 hover:bg-zinc-200 transition-colors rounded-sm flex items-center justify-center gap-2">
+              <LockOpen className="w-4 h-4" /> Unlock
             </button>
           </form>
           <p className="text-center text-zinc-600 text-xs mt-6 uppercase tracking-widest">Protected System</p>
@@ -367,7 +376,7 @@ function App() {
               <p className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                 Yet Another Tunneling Manager
                 <span className="w-1 h-1 bg-zinc-700 rounded-full"></span>
-                v0.1.0
+                v0.1.10
               </p>
             </div>
           </div>
@@ -446,15 +455,21 @@ function App() {
         <div className="flex gap-4 border-b border-zinc-900">
           <button
             onClick={() => setActiveTab('tunnels')}
-            className={clsx("pb-2 px-1 text-sm font-bold uppercase tracking-wider transition-colors", activeTab === 'tunnels' ? "text-white border-b-2 border-white" : "text-zinc-600 hover:text-zinc-400")}
+            className={clsx("pb-2 px-1 text-sm font-bold uppercase tracking-wider transition-colors flex items-center gap-2", activeTab === 'tunnels' ? "text-white border-b-2 border-white" : "text-zinc-600 hover:text-zinc-400")}
           >
-            Tunnels
+            <Zap className="w-4 h-4" /> Tunnels
           </button>
           <button
             onClick={() => setActiveTab('domains')}
-            className={clsx("pb-2 px-1 text-sm font-bold uppercase tracking-wider transition-colors", activeTab === 'domains' ? "text-white border-b-2 border-white" : "text-zinc-600 hover:text-zinc-400")}
+            className={clsx("pb-2 px-1 text-sm font-bold uppercase tracking-wider transition-colors flex items-center gap-2", activeTab === 'domains' ? "text-white border-b-2 border-white" : "text-zinc-600 hover:text-zinc-400")}
           >
-            Domains
+            <Globe className="w-4 h-4" /> Domains
+          </button>
+          <button
+            onClick={() => setActiveTab('inspector')}
+            className={clsx("pb-2 px-1 text-sm font-bold uppercase tracking-wider transition-colors flex items-center gap-2", activeTab === 'inspector' ? "text-white border-b-2 border-white" : "text-zinc-600 hover:text-zinc-400")}
+          >
+            <Eye className="w-4 h-4" /> Inspector
           </button>
         </div>
 
@@ -676,29 +691,155 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'inspector' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300 h-[600px]">
+            {/* Request List */}
+            <div className="border border-zinc-900 bg-zinc-950/30 rounded-sm flex flex-col overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-900 bg-zinc-950/50 flex justify-between items-center">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> Live Requests
+                </h3>
+                <span className="text-[10px] bg-zinc-900 text-zinc-500 px-2 py-1 rounded-full">{inspectorLogs.length} events</span>
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-900">
+                {inspectorLogs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-zinc-800 gap-2 p-8">
+                    <Search className="w-8 h-8 opacity-20" />
+                    <span className="text-xs font-bold opacity-50">Waiting for traffic...</span>
+                  </div>
+                ) : (
+                  inspectorLogs.map(log => (
+                    <div
+                      key={log.id}
+                      onClick={() => setSelectedLogId(log.id)}
+                      className={clsx(
+                        "p-3 cursor-pointer hover:bg-zinc-900/40 transition-colors border-l-2 flex flex-col gap-1",
+                        selectedLogId === log.id ? "bg-zinc-900/60 border-blue-500" : "border-transparent"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className={clsx("text-[10px] font-bold px-1.5 py-0.5 rounded",
+                          log.method === 'GET' ? 'bg-blue-900/20 text-blue-500' :
+                            log.method === 'POST' ? 'bg-green-900/20 text-green-500' :
+                              log.method === 'DELETE' ? 'bg-red-900/20 text-red-500' : 'bg-zinc-800 text-zinc-400'
+                        )}>{log.method}</span>
+                        <span className={clsx("text-[10px] font-mono", log.status >= 400 ? "text-red-500" : "text-green-500")}>
+                          {log.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-zinc-300 truncate font-mono" title={log.url}>{log.url}</div>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-[10px] text-zinc-600 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {log.duration_ms}ms
+                        </span>
+                        <span className="text-[10px] text-zinc-700">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Details Panel */}
+            <div className="lg:col-span-2 border border-zinc-900 bg-zinc-950/30 rounded-sm flex flex-col overflow-hidden relative">
+              {inspectorLogs.find(l => l.id === selectedLogId) ? (
+                (() => {
+                  const log = inspectorLogs.find(l => l.id === selectedLogId);
+                  return (
+                    <div className="flex flex-col h-full">
+                      <div className="px-6 py-4 border-b border-zinc-900 bg-zinc-950/50 flex justify-between items-start">
+                        <div className="flex flex-col gap-1">
+                          <h2 className="text-lg font-bold text-white font-mono break-all">{log.method} {log.url}</h2>
+                          <div className="flex gap-4 text-xs text-zinc-500">
+                            <span>ID: {log.id}</span>
+                            <span>IP: {log.client_ip}</span>
+                            <span>Time: {new Date(log.timestamp).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className={clsx("text-xl font-bold px-3 py-1 rounded border",
+                          log.status >= 400 ? "border-red-900/50 text-red-500 bg-red-950/10" : "border-green-900/50 text-green-500 bg-green-950/10"
+                        )}>
+                          {log.status}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                        {/* Request */}
+                        <div>
+                          <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                            <ArrowUpRight className="w-4 h-4" /> Request Headers
+                          </h3>
+                          <div className="bg-black/50 border border-zinc-900 rounded p-4 font-mono text-xs text-zinc-400 overflow-x-auto">
+                            {Object.entries(log.req_headers || {}).map(([k, v]) => (
+                              <div key={k} className="flex gap-2">
+                                <span className="text-blue-400 font-bold min-w-[120px]">{k}:</span>
+                                <span className="break-all">{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {log.req_body && (
+                          <div>
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                              <Code className="w-4 h-4" /> Request Body
+                            </h3>
+                            <pre className="bg-black/50 border border-zinc-900 rounded p-4 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">{log.req_body}</pre>
+                          </div>
+                        )}
+
+                        {/* Response */}
+                        <div>
+                          <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                            <ArrowUpRight className="w-4 h-4 rotate-180" /> Response Headers
+                          </h3>
+                          <div className="bg-black/50 border border-zinc-900 rounded p-4 font-mono text-xs text-zinc-400 overflow-x-auto">
+                            {Object.entries(log.res_headers || {}).map(([k, v]) => (
+                              <div key={k} className="flex gap-2">
+                                <span className="text-purple-400 font-bold min-w-[120px]">{k}:</span>
+                                <span className="break-all">{v}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {log.res_body && (
+                          <div>
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                              <Code className="w-4 h-4" /> Response Body
+                            </h3>
+                            <pre className="bg-black/50 border border-zinc-900 rounded p-4 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
+                              {log.res_body.length > 2000 ? log.res_body.substring(0, 2000) + '... (Truncated)' : log.res_body}
+                            </pre>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-700">
+                  <div className="w-16 h-16 border-2 border-zinc-800 rounded-lg flex items-center justify-center mb-4">
+                    <Activity className="w-8 h-8" />
+                  </div>
+                  <p className="text-sm font-bold uppercase tracking-wider">Select a request to view details</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
 
 function ToastContainer({ toasts, removeToast }) {
-  if (toasts.length === 0) return null;
   return createPortal(
-    <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
+    <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50 pointer-events-none">
       {toasts.map(toast => (
-        <div
-          key={toast.id}
-          className={clsx(
-            "flex items-center gap-3 p-4 rounded-sm border shadow-2xl animate-in slide-in-from-bottom-4 transition-all w-[350px] backdrop-blur-md",
-            toast.type === 'error' ? "bg-black/90 border-red-900 text-red-500" : "bg-black/90 border-zinc-800 text-white"
-          )}
-        >
-          {toast.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0" /> : <Shield className="w-5 h-5 shrink-0 text-green-500" />}
-          <p className="text-xs font-bold uppercase tracking-wide flex-1">{toast.message}</p>
-          <button onClick={() => removeToast(toast.id)} className="text-zinc-600 hover:text-white transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <Toast key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
     </div>,
     document.body
@@ -733,7 +874,62 @@ function formatTime(seconds) {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+
+function Toast({ toast, onRemove }) {
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const enterTimer = setTimeout(() => setVisible(true), 10);
+    const autoCloseTimer = setTimeout(() => handleClose(), 5000);
+    return () => { clearTimeout(enterTimer); clearTimeout(autoCloseTimer); };
+  }, []);
+
+  const handleClose = () => {
+    setVisible(false);
+    setTimeout(() => onRemove(toast.id), 400);
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <div
+      className={clsx(
+        "pointer-events-auto flex items-center gap-3 p-4 rounded-sm border shadow-2xl w-[350px] backdrop-blur-md relative overflow-hidden group",
+        toast.type === 'error' ? "bg-black/90 border-red-900 text-red-500" : "bg-black/90 border-zinc-800 text-white"
+      )}
+      style={{
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        transform: visible ? 'translateX(0)' : 'translateX(100%)',
+        opacity: visible ? 1 : 0,
+      }}
+    >
+      <div className={clsx("absolute left-0 top-0 bottom-0 w-1", toast.type === 'error' ? "bg-red-500" : "bg-green-500")} />
+
+      {toast.type === 'error' ? <AlertCircle className="w-5 h-5 shrink-0" /> : <Shield className="w-5 h-5 shrink-0 text-green-500" />}
+      <div className="flex-1 flex flex-col">
+        <p className="text-xs font-bold uppercase tracking-wide">{toast.message}</p>
+        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Notification</p>
+      </div>
+      <button onClick={handleClose} className="text-zinc-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
 export default App;
+
+
+
+
+
+
+
+
+
+
 
 
 
