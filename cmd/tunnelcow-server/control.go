@@ -103,7 +103,7 @@ func (c *ClientSession) handleReqBind(payload json.RawMessage) {
 	}
 
 	c.Listeners[req.PublicPort] = ln
-	globalSessions.Register(req.PublicPort, c)
+	GlobalSessions.Register(req.PublicPort, c)
 	if c.Debug {
 		log.Printf("Bound public port %d", req.PublicPort)
 	}
@@ -131,7 +131,7 @@ func (c *ClientSession) handleReqUnbind(payload json.RawMessage) {
 
 	ln.Close()
 	delete(c.Listeners, req.PublicPort)
-	globalSessions.Unregister(req.PublicPort)
+	GlobalSessions.Unregister(req.PublicPort)
 	if c.Debug {
 		log.Printf("Unbound public port %d", req.PublicPort)
 	}
@@ -212,7 +212,7 @@ func (c *ClientSession) Cleanup() {
 
 	for port, ln := range c.Listeners {
 		ln.Close()
-		globalSessions.Unregister(port)
+		GlobalSessions.Unregister(port)
 		if c.Debug {
 			log.Printf("Closed listener on port %d", port)
 		}

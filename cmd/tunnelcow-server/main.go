@@ -273,7 +273,7 @@ func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func sendInspectData(publicPort int, data tunnel.InspectPayload) {
-	session, ok := globalSessions.Get(publicPort)
+	session, ok := GlobalSessions.Get(publicPort)
 	if !ok {
 		return
 	}
