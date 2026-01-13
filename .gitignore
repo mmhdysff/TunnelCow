@@ -13,7 +13,7 @@ tunnelcow-server-linux
 
 # Dependencies
 node_modules/
-package-lock.json
+
 
 # Build Output
 dist/
