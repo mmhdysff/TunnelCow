@@ -67,6 +67,23 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build Frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Embed Frontend Assets
+        run: |
+          mkdir -p cmd/tunnelcow-client/web_dist
+          cp -r web/dist/* cmd/tunnelcow-client/web_dist/
+          ls -R cmd/tunnelcow-client/web_dist/
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:

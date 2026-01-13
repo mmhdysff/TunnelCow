@@ -7,6 +7,7 @@ import (
 	"net/http"
 )
 
+//go:embed web_dist
 var webDist embed.FS
 
 func getWebFileSystem() http.FileSystem {
