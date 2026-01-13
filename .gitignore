@@ -1,0 +1,32 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+tunnelcow-client
+tunnelcow-server
+tunnelcow-client-linux
+tunnelcow-server-linux
+
+# Logs
+*.log
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build Output
+dist/
+web/dist/
+cmd/tunnelcow-client/web_dist/
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Data / Config / Secrets
+data/
+data/client_config.json
+data/.build_info.json

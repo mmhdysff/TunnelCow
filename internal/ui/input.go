@@ -95,7 +95,7 @@ func Input(title, prompt string, isPassword bool) string {
 
 	fmt.Printf("%s%s│ %s%s│%s\n", padding, Cyan, strings.Repeat(" ", boxWidth-4), Cyan, Reset)
 
-	inputLineViz := "> ____________________"
+	inputLineViz := "> __________________________________________________"
 	fmt.Printf("%s%s│ %s%s%s│%s\n", padding, Cyan, Gray+inputLineViz, strings.Repeat(" ", boxWidth-len(inputLineViz)-4), Cyan, Reset)
 
 	fmt.Printf("%s%s│ %s%s│%s\n", padding, Cyan, strings.Repeat(" ", boxWidth-4), Cyan, Reset)
@@ -141,7 +141,7 @@ func Input(title, prompt string, isPassword bool) string {
 
 		if char >= 32 && char <= 126 {
 
-			if len(input) < 20 {
+			if len(input) < 50 {
 				input = append(input, rune(char))
 				if isPassword {
 					fmt.Print("*")
