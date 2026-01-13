@@ -2,18 +2,70 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Next Version
+        id: version
+        shell: bash
+        run: |
+          # Get the latest tag, default to v0.0.0 if none
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Remove 'v' prefix
+          VERSION=${LATEST_TAG#v}
+          
+          # Split into array
+          IFS='.' read -r -a PARTS <<< "$VERSION"
+          MAJOR=${PARTS[0]}
+          MINOR=${PARTS[1]}
+          PATCH=${PARTS[2]}
+          
+          # Increment patch
+          NEW_PATCH=$((PATCH + 1))
+          NEW_TAG="v$MAJOR.$MINOR.$NEW_PATCH"
+          
+          echo "New version: $NEW_TAG"
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Update README Version Badge
+        run: |
+          # Replace version-X.X.X-blue with new version
+          sed -i "s/version-[0-9]*\.[0-9]*\.[0-9]*-blue/version-${{ steps.version.outputs.tag }}-blue/" README.md
+          
+          # Verify change
+          grep "version-${{ steps.version.outputs.tag }}-blue" README.md || echo "Warning: README badge not updated or not found"
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add README.md
+          
+          # Only commit if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "[skip ci] Docs: update version to ${{ steps.version.outputs.tag }}"
+            git push origin main
+          fi
+          
+          # Push the new tag
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -25,20 +77,29 @@ jobs:
           GOOS: windows
           GOARCH: amd64
         run: |
-          go build -o tunnelcow-client.exe ./cmd/tunnelcow-client
-          go build -o tunnelcow-server.exe ./cmd/tunnelcow-server
+          # Inject version into binary
+          VERSION=${{ steps.version.outputs.tag }}
+          LDFLAGS="-X main.Version=$VERSION -s -w"
+          
+          go build -ldflags "$LDFLAGS" -o tunnelcow-client.exe ./cmd/tunnelcow-client
+          go build -ldflags "$LDFLAGS" -o tunnelcow-server.exe ./cmd/tunnelcow-server
 
       - name: Build Linux Binaries
         env:
           GOOS: linux
           GOARCH: amd64
         run: |
-          go build -o tunnelcow-client-linux ./cmd/tunnelcow-client
-          go build -o tunnelcow-server-linux ./cmd/tunnelcow-server
+          VERSION=${{ steps.version.outputs.tag }}
+          LDFLAGS="-X main.Version=$VERSION -s -w"
+          
+          go build -ldflags "$LDFLAGS" -o tunnelcow-client-linux ./cmd/tunnelcow-client
+          go build -ldflags "$LDFLAGS" -o tunnelcow-server-linux ./cmd/tunnelcow-server
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
           files: |
             tunnelcow-client.exe
             tunnelcow-server.exe
