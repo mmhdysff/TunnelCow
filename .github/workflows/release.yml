@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build Windows Binaries
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build -o tunnelcow-client.exe ./cmd/tunnelcow-client
+          go build -o tunnelcow-server.exe ./cmd/tunnelcow-server
+
+      - name: Build Linux Binaries
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -o tunnelcow-client-linux ./cmd/tunnelcow-client
+          go build -o tunnelcow-server-linux ./cmd/tunnelcow-server
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            tunnelcow-client.exe
+            tunnelcow-server.exe
+            tunnelcow-client-linux
+            tunnelcow-server-linux
+          draft: false
+          prerelease: false
