@@ -204,19 +204,20 @@ func (s *APIServer) handleDomains(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
 		var req struct {
-			Domain     string `json:"domain"`
-			PublicPort int    `json:"public_port"`
-			Mode       string `json:"mode"`
-			AuthUser   string `json:"auth_user"`
-			AuthPass   string `json:"auth_pass"`
-			RateLimit  int    `json:"rate_limit"`
+			Domain      string `json:"domain"`
+			PublicPort  int    `json:"public_port"`
+			Mode        string `json:"mode"`
+			AuthUser    string `json:"auth_user"`
+			AuthPass    string `json:"auth_pass"`
+			RateLimit   int    `json:"rate_limit"`
+			SmartShield bool   `json:"smart_shield"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 
-		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass, req.RateLimit); err != nil {
+		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass, req.RateLimit, req.SmartShield); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

@@ -24,11 +24,12 @@ type TunnelConfig struct {
 }
 
 type ClientDomainEntry struct {
-	PublicPort int    `json:"public_port"`
-	Mode       string `json:"mode"`
-	AuthUser   string `json:"auth_user,omitempty"`
-	AuthPass   string `json:"auth_pass,omitempty"`
-	RateLimit  int    `json:"rate_limit,omitempty"`
+	PublicPort  int    `json:"public_port"`
+	Mode        string `json:"mode"`
+	AuthUser    string `json:"auth_user,omitempty"`
+	AuthPass    string `json:"auth_pass,omitempty"`
+	RateLimit   int    `json:"rate_limit,omitempty"`
+	SmartShield bool   `json:"smart_shield,omitempty"`
 }
 
 type ClientManager struct {
@@ -50,7 +51,7 @@ func NewClientManager(control net.Conn, session *yamux.Session, debug bool) *Cli
 	}
 }
 
-func (m *ClientManager) AddDomain(domain string, publicPort int, mode string, authUser, authPass string, rateLimit int) error {
+func (m *ClientManager) AddDomain(domain string, publicPort int, mode string, authUser, authPass string, rateLimit int, smartShield bool) error {
 	m.Mu.RLock()
 	defer m.Mu.RUnlock()
 
@@ -76,14 +77,15 @@ func (m *ClientManager) AddDomain(domain string, publicPort int, mode string, au
 	}
 
 	m.Domains[domain] = ClientDomainEntry{
-		PublicPort: publicPort,
-		Mode:       mode,
-		AuthUser:   authUser,
-		AuthPass:   authPass,
-		RateLimit:  rateLimit,
+		PublicPort:  publicPort,
+		Mode:        mode,
+		AuthUser:    authUser,
+		AuthPass:    authPass,
+		RateLimit:   rateLimit,
+		SmartShield: smartShield,
 	}
 	m.saveDomains()
-	log.Printf("Mapped domain %s -> :%d (Mode: %s, Auth: %v, Limit: %d)", domain, publicPort, mode, authUser != "", rateLimit)
+	log.Printf("Mapped domain %s -> :%d (Mode: %s, Auth: %v, Limit: %d, Shield: %v)", domain, publicPort, mode, authUser != "", rateLimit, smartShield)
 	return nil
 }
 
@@ -109,22 +111,24 @@ func (m *ClientManager) RemoveDomain(domain string) error {
 
 func (m *ClientManager) saveDomains() {
 	type savedDomain struct {
-		Domain    string `json:"domain"`
-		Port      int    `json:"port"`
-		Mode      string `json:"mode"`
-		AuthUser  string `json:"auth_user,omitempty"`
-		AuthPass  string `json:"auth_pass,omitempty"`
-		RateLimit int    `json:"rate_limit,omitempty"`
+		Domain      string `json:"domain"`
+		Port        int    `json:"port"`
+		Mode        string `json:"mode"`
+		AuthUser    string `json:"auth_user,omitempty"`
+		AuthPass    string `json:"auth_pass,omitempty"`
+		RateLimit   int    `json:"rate_limit,omitempty"`
+		SmartShield bool   `json:"smart_shield,omitempty"`
 	}
 	var list = []savedDomain{}
 	for d, e := range m.Domains {
 		list = append(list, savedDomain{
-			Domain:    d,
-			Port:      e.PublicPort,
-			Mode:      e.Mode,
-			AuthUser:  e.AuthUser,
-			AuthPass:  e.AuthPass,
-			RateLimit: e.RateLimit,
+			Domain:      d,
+			Port:        e.PublicPort,
+			Mode:        e.Mode,
+			AuthUser:    e.AuthUser,
+			AuthPass:    e.AuthPass,
+			RateLimit:   e.RateLimit,
+			SmartShield: e.SmartShield,
 		})
 	}
 	file, _ := json.MarshalIndent(list, "", "  ")
@@ -138,12 +142,13 @@ func (m *ClientManager) restoreDomains() {
 		return
 	}
 	type savedDomain struct {
-		Domain    string `json:"domain"`
-		Port      int    `json:"port"`
-		Mode      string `json:"mode"`
-		AuthUser  string `json:"auth_user,omitempty"`
-		AuthPass  string `json:"auth_pass,omitempty"`
-		RateLimit int    `json:"rate_limit,omitempty"`
+		Domain      string `json:"domain"`
+		Port        int    `json:"port"`
+		Mode        string `json:"mode"`
+		AuthUser    string `json:"auth_user,omitempty"`
+		AuthPass    string `json:"auth_pass,omitempty"`
+		RateLimit   int    `json:"rate_limit,omitempty"`
+		SmartShield bool   `json:"smart_shield,omitempty"`
 	}
 	var list []savedDomain
 	if err := json.Unmarshal(data, &list); err != nil {
@@ -154,7 +159,7 @@ func (m *ClientManager) restoreDomains() {
 		if d.Mode == "" {
 			d.Mode = "auto"
 		}
-		if err := m.AddDomain(d.Domain, d.Port, d.Mode, d.AuthUser, d.AuthPass, d.RateLimit); err != nil {
+		if err := m.AddDomain(d.Domain, d.Port, d.Mode, d.AuthUser, d.AuthPass, d.RateLimit, d.SmartShield); err != nil {
 			log.Printf("Failed to restore domain %s: %v", d.Domain, err)
 		}
 	}

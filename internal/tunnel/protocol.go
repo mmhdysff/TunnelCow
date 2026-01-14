@@ -26,12 +26,13 @@ type ReqUnbindPayload struct {
 }
 
 type ReqDomainMapPayload struct {
-	Domain     string `json:"domain"`
-	PublicPort int    `json:"public_port"`
-	Mode       string `json:"mode"`
-	AuthUser   string `json:"auth_user,omitempty"`
-	AuthPass   string `json:"auth_pass,omitempty"`
-	RateLimit  int    `json:"rate_limit,omitempty"`
+	Domain      string `json:"domain"`
+	PublicPort  int    `json:"public_port"`
+	Mode        string `json:"mode"`
+	AuthUser    string `json:"auth_user,omitempty"`
+	AuthPass    string `json:"auth_pass,omitempty"`
+	RateLimit   int    `json:"rate_limit,omitempty"`
+	SmartShield bool   `json:"smart_shield,omitempty"`
 }
 
 type ReqDomainUnmapPayload struct {

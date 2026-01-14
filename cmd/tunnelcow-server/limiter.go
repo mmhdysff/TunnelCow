@@ -19,8 +19,6 @@ var GlobalLimiter = &RateLimiter{
 	visitors: make(map[string]*visitor),
 }
 
-// Allow checks if the IP is allowed to proceed given the rps limit.
-// Returns true if allowed, false if limit exceeded.
 func (rl *RateLimiter) Allow(ip string, limit int) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -36,7 +34,6 @@ func (rl *RateLimiter) Allow(ip string, limit int) bool {
 		return true
 	}
 
-	// Reset counter if more than 1 second has passed
 	if now.Sub(v.lastReset) > time.Second {
 		v.count = 1
 		v.lastReset = now

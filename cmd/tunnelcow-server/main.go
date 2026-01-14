@@ -139,6 +139,18 @@ func startHTTPSListener(finalToken string) {
 				return
 			}
 
+			if r.URL.Path == "/tunnelcow" && r.Method == "POST" {
+				handleShieldVerify(w, r, finalToken)
+				return
+			}
+
+			if entry.SmartShield {
+				if !validateShieldCookie(r, finalToken) {
+					serveChallengePage(w)
+					return
+				}
+			}
+
 			if entry.RateLimit > 0 {
 				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 				if !GlobalLimiter.Allow(ip, entry.RateLimit) {
@@ -186,6 +198,13 @@ func startHTTPSListener(finalToken string) {
 		if !ok {
 			http.Error(w, "Domain not mapped", 404)
 			return
+		}
+
+		if entry.SmartShield {
+			if !validateShieldCookie(r, finalToken) {
+				serveChallengePage(w)
+				return
+			}
 		}
 
 		if entry.RateLimit > 0 {
