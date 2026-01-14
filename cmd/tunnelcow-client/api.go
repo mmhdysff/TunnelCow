@@ -29,6 +29,7 @@ func startAPIServer() {
 
 	mux.Handle("/api/status", authMiddleware(http.HandlerFunc(api.handleStatus)))
 	mux.Handle("/api/tunnels", authMiddleware(http.HandlerFunc(api.handleTunnels)))
+	mux.Handle("/api/tunnels/edit", authMiddleware(http.HandlerFunc(api.handleTunnelsEdit)))
 	mux.Handle("/api/domains", authMiddleware(http.HandlerFunc(api.handleDomains)))
 	mux.Handle("/api/inspect", authMiddleware(http.HandlerFunc(api.handleInspect)))
 	mux.Handle("/api/replay", authMiddleware(http.HandlerFunc(api.handleReplay)))
@@ -192,6 +193,36 @@ func (s *APIServer) handleTunnels(w http.ResponseWriter, r *http.Request) {
 
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "deleted", "count": count})
 	}
+}
+
+func (s *APIServer) handleTunnelsEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		PublicPort int `json:"public_port"`
+		LocalPort  int `json:"local_port"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+
+	mgr := s.Manager
+	if mgr == nil {
+		http.Error(w, "Manager not initialized", 503)
+		return
+	}
+
+	if err := mgr.EditTunnel(req.PublicPort, req.LocalPort); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func (s *APIServer) handleDomains(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
-import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square, Eye, Search, Code, Clock, LockOpen, Lock, Bell, BellOff, Repeat } from 'lucide-react';
+import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square, Eye, Search, Code, Clock, LockOpen, Lock, Bell, BellOff, Repeat, Pencil } from 'lucide-react';
 import clsx from 'clsx';
 import { createPortal } from 'react-dom';
 
@@ -79,7 +79,9 @@ function App() {
   const [status, setStatus] = useState({ connected: false, tunnels: {}, domains: {} });
   const [activeTab, setActiveTab] = useState('tunnels');
   const [newTunnel, setNewTunnel] = useState({ public_port: '', local_port: '', protocol: 'TCP' });
+  const [editTunnel, setEditTunnel] = useState(null);
   const [newDomain, setNewDomain] = useState({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '', rate_limit: 0, smart_shield: false });
+  const [isEditMode, setIsEditMode] = useState(false);
   const [data, setData] = useState([]);
   const [lastStats, setLastStats] = useState({ up: 0, down: 0, time: Date.now() });
   const [toasts, setToasts] = useState([]);
@@ -348,6 +350,45 @@ function App() {
     });
   }
 
+  const handleEditTunnel = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/tunnels/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          public_port: parseInt(editTunnel.public_port),
+          local_port: parseInt(editTunnel.local_port)
+        })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setEditTunnel(null);
+      fetchStatus();
+      addToast(`Updated tunnel :${editTunnel.public_port}`, "success");
+    } catch (err) {
+      addToast(err.message, "error");
+    }
+  };
+
+  const handleEditDomain = (domainName, portData) => {
+    setNewDomain({
+      domain: domainName,
+      target_port: portData.public_port,
+      mode: portData.mode || 'auto',
+      auth_user: portData.auth_user || '',
+      auth_pass: portData.auth_pass || '',
+      rate_limit: portData.rate_limit || 0,
+      smart_shield: portData.smart_shield || false
+    });
+    setIsEditMode(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetDomainForm = () => {
+    setNewDomain({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '', rate_limit: 0, smart_shield: false });
+    setIsEditMode(false);
+  };
+
   const addDomain = async (e) => {
     e.preventDefault();
     if (!newDomain.domain || !newDomain.target_port) {
@@ -371,6 +412,7 @@ function App() {
       });
       if (!res.ok) throw new Error(await res.text());
       setNewDomain({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '', rate_limit: 0, smart_shield: false });
+      setIsEditMode(false);
       fetchStatus();
       addToast(`Mapped ${newDomain.domain}`, "success");
     } catch (err) {
@@ -391,7 +433,11 @@ function App() {
             body: JSON.stringify({ domain })
           });
           fetchStatus();
+          fetchStatus();
           addToast(`Unmapped ${domain}`, "success");
+          if (newDomain.domain === domain) {
+            resetDomainForm();
+          }
         } catch (err) {
           addToast("Failed to unmap domain", "error");
         }
@@ -625,13 +671,23 @@ function App() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => deleteTunnel(pub)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 hover:bg-red-950/30 rounded-full transition-all"
-                        title="Stop Tunnel"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditTunnel({ public_port: pub, local_port: local })}
+                          className="p-2 text-zinc-600 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
+                          title="Edit Tunnel"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteTunnel(pub)}
+                          className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-950/30 rounded-full transition-all"
+                          title="Stop Tunnel"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -857,8 +913,12 @@ function App() {
                   </select>
                 </div>
 
-                <button type="submit" className="w-full bg-white text-black font-bold text-sm uppercase py-3 hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 mt-2 rounded-sm active:scale-95 transform duration-100">
-                  <Shield className="w-4 h-4" /> Secure & Map
+                <button type="submit" className={`w-full font-bold text-sm uppercase py-3 transition-colors flex items-center justify-center gap-2 mt-2 rounded-sm active:scale-95 transform duration-100 ${isEditMode ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-white text-black hover:bg-zinc-200'}`}>
+                  {isEditMode ? (
+                    <> <Pencil className="w-4 h-4" /> Update Settings </>
+                  ) : (
+                    <> <Shield className="w-4 h-4" /> Secure & Map </>
+                  )}
                 </button>
               </form>
             </div>
@@ -1032,7 +1092,7 @@ function App() {
         )}
 
       </div>
-    </div>
+    </div >
   );
 }
 

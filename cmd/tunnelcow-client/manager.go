@@ -220,6 +220,43 @@ func (m *ClientManager) AddTunnel(publicPort, localPort int) error {
 	return nil
 }
 
+func (m *ClientManager) EditTunnel(publicPort, localPort int) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
+	if _, exists := m.Tunnels[publicPort]; !exists {
+		return fmt.Errorf("public port %d is not active", publicPort)
+	}
+
+	State.Mu.RLock()
+	dashPort := State.DashboardPort
+	serverAddr := State.ServerAddr
+	State.Mu.RUnlock()
+
+	if localPort == dashPort {
+		return fmt.Errorf("cannot use dashboard port %d for tunneling", dashPort)
+	}
+	if parts := strings.Split(serverAddr, ":"); len(parts) == 2 {
+		if p, err := strconv.Atoi(parts[1]); err == nil {
+			if localPort == p {
+				return fmt.Errorf("port %d conflicts with server control port", p)
+			}
+		}
+	}
+	if tcpAddr, ok := m.Control.LocalAddr().(*net.TCPAddr); ok {
+		if localPort == tcpAddr.Port {
+			return fmt.Errorf("port %d is the active link to server (ephemeral). dangerous to tunnel.", tcpAddr.Port)
+		}
+	}
+
+	m.Tunnels[publicPort] = localPort
+	m.saveTunnels()
+	if State.Debug {
+		log.Printf("Edited tunnel: Public :%d is now mapped to Local :%d", publicPort, localPort)
+	}
+	return nil
+}
+
 func (m *ClientManager) AddRange(publicStr, localStr string) error {
 	if strings.Contains(publicStr, "-") {
 		pParts := strings.Split(publicStr, "-")

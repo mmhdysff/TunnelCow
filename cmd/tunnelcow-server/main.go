@@ -24,6 +24,7 @@ import (
 )
 
 var Version = "dev"
+var GlobalDebug = false
 
 func main() {
 	fmt.Printf("TunnelCow Server %s\n", Version)
@@ -76,6 +77,7 @@ func main() {
 	if !finalDebug && serverCfg.Debug {
 		finalDebug = true
 	}
+	GlobalDebug = finalDebug
 
 	if finalDebug {
 		log.Println("[DEBUG] Debug Mode: ENABLED")
@@ -126,6 +128,7 @@ func startHTTPSListener(finalToken string) {
 	server := &http.Server{
 		Addr:      ":443",
 		TLSConfig: m.TLSConfig(),
+		ErrorLog:  log.New(&QuietWriter{}, "", 0),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			host := r.Host
@@ -144,17 +147,17 @@ func startHTTPSListener(finalToken string) {
 				return
 			}
 
-			if entry.SmartShield {
-				if !validateShieldCookie(r, finalToken) {
-					serveChallengePage(w)
-					return
-				}
-			}
-
 			if entry.RateLimit > 0 {
 				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 				if !GlobalLimiter.Allow(ip, entry.RateLimit) {
 					http.Error(w, "Too Many Requests", 429)
+					return
+				}
+			}
+
+			if entry.SmartShield {
+				if !validateShieldCookie(r, finalToken) {
+					serveChallengePage(w)
 					return
 				}
 			}
@@ -200,17 +203,17 @@ func startHTTPSListener(finalToken string) {
 			return
 		}
 
-		if entry.SmartShield {
-			if !validateShieldCookie(r, finalToken) {
-				serveChallengePage(w)
-				return
-			}
-		}
-
 		if entry.RateLimit > 0 {
 			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 			if !GlobalLimiter.Allow(ip, entry.RateLimit) {
 				http.Error(w, "Too Many Requests", 429)
+				return
+			}
+		}
+
+		if entry.SmartShield {
+			if !validateShieldCookie(r, finalToken) {
+				serveChallengePage(w)
 				return
 			}
 		}
@@ -372,7 +375,9 @@ func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func sendInspectData(publicPort int, data tunnel.InspectPayload) {
-	log.Printf("[INSPECT] Sending inspection data for port %d (URL: %s)", publicPort, data.URL)
+	if GlobalDebug {
+		log.Printf("[INSPECT] Sending inspection data for port %d (URL: %s)", publicPort, data.URL)
+	}
 	session, ok := GlobalSessions.Get(publicPort)
 	if !ok {
 		log.Printf("[INSPECT] Failed to find session for port %d", publicPort)
@@ -381,7 +386,9 @@ func sendInspectData(publicPort int, data tunnel.InspectPayload) {
 
 	payloadBytes, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("[INSPECT] JSON Marshal failed: %v", err)
+		if GlobalDebug {
+			log.Printf("[INSPECT] JSON Marshal failed: %v", err)
+		}
 		return
 	}
 	msg := tunnel.ControlMessage{
@@ -393,9 +400,13 @@ func sendInspectData(publicPort int, data tunnel.InspectPayload) {
 	defer session.Mu.Unlock()
 
 	if err := json.NewEncoder(session.Control).Encode(msg); err != nil {
-		log.Printf("[INSPECT] Failed to encode/send message: %v", err)
+		if GlobalDebug {
+			log.Printf("[INSPECT] Failed to encode/send message: %v", err)
+		}
 	} else {
-		log.Printf("[INSPECT] Sent %d bytes to client", len(payloadBytes))
+		if GlobalDebug {
+			log.Printf("[INSPECT] Sent %d bytes to client", len(payloadBytes))
+		}
 	}
 }
 
@@ -446,4 +457,16 @@ func isBinary(data []byte) bool {
 		}
 	}
 	return false
+}
+
+type QuietWriter struct{}
+
+func (w *QuietWriter) Write(p []byte) (n int, err error) {
+	msg := string(p)
+
+	if !GlobalDebug && strings.Contains(msg, "http: TLS handshake error") {
+		return len(p), nil
+	}
+
+	return os.Stderr.Write(p)
 }
