@@ -29,6 +29,8 @@ type ReqDomainMapPayload struct {
 	Domain     string `json:"domain"`
 	PublicPort int    `json:"public_port"`
 	Mode       string `json:"mode"`
+	AuthUser   string `json:"auth_user,omitempty"`
+	AuthPass   string `json:"auth_pass,omitempty"`
 }
 
 type ReqDomainUnmapPayload struct {
@@ -51,4 +53,5 @@ type InspectPayload struct {
 	ResBody    string            `json:"res_body"`
 	DurationMs int64             `json:"duration_ms"`
 	ClientIP   string            `json:"client_ip"`
+	PublicPort int               `json:"public_port"`
 }

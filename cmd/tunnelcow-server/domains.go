@@ -9,6 +9,8 @@ import (
 type DomainEntry struct {
 	PublicPort int    `json:"public_port"`
 	Mode       string `json:"mode"`
+	AuthUser   string `json:"auth_user,omitempty"`
+	AuthPass   string `json:"auth_pass,omitempty"`
 }
 
 type DomainManager struct {
@@ -43,13 +45,18 @@ func (dm *DomainManager) save() {
 	os.WriteFile(dm.File, data, 0644)
 }
 
-func (dm *DomainManager) Add(domain string, port int, mode string) {
+func (dm *DomainManager) Add(domain string, port int, mode string, authUser, authPass string) {
 	dm.Mu.Lock()
 	defer dm.Mu.Unlock()
 	if mode == "" {
 		mode = "auto"
 	}
-	dm.Domains[domain] = DomainEntry{PublicPort: port, Mode: mode}
+	dm.Domains[domain] = DomainEntry{
+		PublicPort: port,
+		Mode:       mode,
+		AuthUser:   authUser,
+		AuthPass:   authPass,
+	}
 	dm.save()
 }
 

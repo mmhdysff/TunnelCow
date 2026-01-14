@@ -26,6 +26,8 @@ type TunnelConfig struct {
 type ClientDomainEntry struct {
 	PublicPort int    `json:"public_port"`
 	Mode       string `json:"mode"`
+	AuthUser   string `json:"auth_user,omitempty"`
+	AuthPass   string `json:"auth_pass,omitempty"`
 }
 
 type ClientManager struct {
@@ -47,7 +49,7 @@ func NewClientManager(control net.Conn, session *yamux.Session, debug bool) *Cli
 	}
 }
 
-func (m *ClientManager) AddDomain(domain string, publicPort int, mode string) error {
+func (m *ClientManager) AddDomain(domain string, publicPort int, mode string, authUser, authPass string) error {
 	m.Mu.RLock()
 	defer m.Mu.RUnlock()
 
@@ -59,6 +61,8 @@ func (m *ClientManager) AddDomain(domain string, publicPort int, mode string) er
 		Domain:     domain,
 		PublicPort: publicPort,
 		Mode:       mode,
+		AuthUser:   authUser,
+		AuthPass:   authPass,
 	}
 
 	msg := tunnel.ControlMessage{
@@ -70,9 +74,14 @@ func (m *ClientManager) AddDomain(domain string, publicPort int, mode string) er
 		return err
 	}
 
-	m.Domains[domain] = ClientDomainEntry{PublicPort: publicPort, Mode: mode}
+	m.Domains[domain] = ClientDomainEntry{
+		PublicPort: publicPort,
+		Mode:       mode,
+		AuthUser:   authUser,
+		AuthPass:   authPass,
+	}
 	m.saveDomains()
-	log.Printf("Mapped domain %s -> :%d (Mode: %s)", domain, publicPort, mode)
+	log.Printf("Mapped domain %s -> :%d (Mode: %s, Auth: %v)", domain, publicPort, mode, authUser != "")
 	return nil
 }
 
@@ -98,13 +107,21 @@ func (m *ClientManager) RemoveDomain(domain string) error {
 
 func (m *ClientManager) saveDomains() {
 	type savedDomain struct {
-		Domain string `json:"domain"`
-		Port   int    `json:"port"`
-		Mode   string `json:"mode"`
+		Domain   string `json:"domain"`
+		Port     int    `json:"port"`
+		Mode     string `json:"mode"`
+		AuthUser string `json:"auth_user,omitempty"`
+		AuthPass string `json:"auth_pass,omitempty"`
 	}
 	var list = []savedDomain{}
 	for d, e := range m.Domains {
-		list = append(list, savedDomain{Domain: d, Port: e.PublicPort, Mode: e.Mode})
+		list = append(list, savedDomain{
+			Domain:   d,
+			Port:     e.PublicPort,
+			Mode:     e.Mode,
+			AuthUser: e.AuthUser,
+			AuthPass: e.AuthPass,
+		})
 	}
 	file, _ := json.MarshalIndent(list, "", "  ")
 	os.MkdirAll("data", 0755)
@@ -117,9 +134,11 @@ func (m *ClientManager) restoreDomains() {
 		return
 	}
 	type savedDomain struct {
-		Domain string `json:"domain"`
-		Port   int    `json:"port"`
-		Mode   string `json:"mode"`
+		Domain   string `json:"domain"`
+		Port     int    `json:"port"`
+		Mode     string `json:"mode"`
+		AuthUser string `json:"auth_user,omitempty"`
+		AuthPass string `json:"auth_pass,omitempty"`
 	}
 	var list []savedDomain
 	if err := json.Unmarshal(data, &list); err != nil {
@@ -130,7 +149,7 @@ func (m *ClientManager) restoreDomains() {
 		if d.Mode == "" {
 			d.Mode = "auto"
 		}
-		if err := m.AddDomain(d.Domain, d.Port, d.Mode); err != nil {
+		if err := m.AddDomain(d.Domain, d.Port, d.Mode, d.AuthUser, d.AuthPass); err != nil {
 			log.Printf("Failed to restore domain %s: %v", d.Domain, err)
 		}
 	}

@@ -22,7 +22,7 @@ var Version = "dev"
 func main() {
 	ui.InitLogger(1000)
 	fmt.Printf("TunnelCow Client %s\n", Version)
-	// Config Load
+
 	serverFlag := flag.String("server", "", "Server address")
 	tokenFlag := flag.String("token", "", "Auth token")
 	flag.Parse()
@@ -34,13 +34,11 @@ func main() {
 	}
 	var clientCfg ClientConfig
 
-	// Load Config
 	configPath := "data/client_config.json"
 	if data, err := os.ReadFile(configPath); err == nil {
 		json.Unmarshal(data, &clientCfg)
 	}
 
-	// 1. Determine Server/Token
 	finalServer := *serverFlag
 	if finalServer == "" {
 		finalServer = clientCfg.ServerAddr
@@ -50,7 +48,6 @@ func main() {
 		finalToken = clientCfg.Token
 	}
 
-	// 2. Setup Wizard if missing
 	if finalServer == "" || finalToken == "" || !auth.HasPassword() {
 		ui.ClearScreen()
 		ui.DrawCenteredBox("Setup Required", []string{
@@ -62,7 +59,6 @@ func main() {
 		})
 		ui.ReadKey()
 
-		// Step 1: Server
 		if finalServer == "" {
 			for {
 				finalServer = ui.Input("Step 1/4: Server", "Enter Server Address (e.g. 1.2.3.4:64290):", false)
@@ -73,10 +69,9 @@ func main() {
 			clientCfg.ServerAddr = finalServer
 		}
 
-		// Step 2: Token
 		if finalToken == "" {
 			for {
-				finalToken = ui.Input("Step 2/4: Authentication", "Enter Server Token:", true) // masked
+				finalToken = ui.Input("Step 2/4: Authentication", "Enter Server Token:", true)
 				if finalToken != "" {
 					break
 				}
@@ -84,9 +79,8 @@ func main() {
 			clientCfg.Token = finalToken
 		}
 
-		// Step 3: Password (if needed)
 		if !auth.HasPassword() {
-			ui.ClearScreen() // Clear previous step
+			ui.ClearScreen()
 			pass := ui.Input("Step 3/4: Security", "Create Password:", true)
 			if pass == "" || len(pass) < 1 {
 				log.Fatal("Password cannot be empty")
@@ -96,7 +90,6 @@ func main() {
 			}
 		}
 
-		// Step 4: Debug
 		ui.ClearScreen()
 		debugChoice := ui.Select("Step 4/4: Settings", []string{
 			"Enable Debug Mode",
@@ -104,7 +97,6 @@ func main() {
 		})
 		clientCfg.Debug = (debugChoice == 0)
 
-		// Save Config
 		bytes, _ := json.MarshalIndent(clientCfg, "", "  ")
 		os.MkdirAll("data", 0755)
 		os.WriteFile(configPath, bytes, 0644)

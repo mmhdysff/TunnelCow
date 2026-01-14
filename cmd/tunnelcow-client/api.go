@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 	"tunnelcow/internal/auth"
@@ -29,6 +31,7 @@ func startAPIServer() {
 	mux.Handle("/api/tunnels", authMiddleware(http.HandlerFunc(api.handleTunnels)))
 	mux.Handle("/api/domains", authMiddleware(http.HandlerFunc(api.handleDomains)))
 	mux.Handle("/api/inspect", authMiddleware(http.HandlerFunc(api.handleInspect)))
+	mux.Handle("/api/replay", authMiddleware(http.HandlerFunc(api.handleReplay)))
 
 	addr := fmt.Sprintf(":%d", tunnel.DefaultDashboardPort)
 	log.Printf("Dashboard API listening on %s", addr)
@@ -58,6 +61,10 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
 		if !auth.ValidateSession(r) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -200,13 +207,15 @@ func (s *APIServer) handleDomains(w http.ResponseWriter, r *http.Request) {
 			Domain     string `json:"domain"`
 			PublicPort int    `json:"public_port"`
 			Mode       string `json:"mode"`
+			AuthUser   string `json:"auth_user"`
+			AuthPass   string `json:"auth_pass"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 
-		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode); err != nil {
+		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
@@ -238,4 +247,99 @@ func (s *APIServer) handleInspect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(logs)
+}
+
+func (s *APIServer) handleReplay(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid Payload", 400)
+		return
+	}
+
+	InspectLogsMu.RLock()
+	var logEntry *tunnel.InspectPayload
+	if list, ok := InspectLogs[0]; ok {
+		for _, l := range list {
+			if l.ID == req.ID {
+				entry := l
+				logEntry = &entry
+				break
+			}
+		}
+	}
+	InspectLogsMu.RUnlock()
+
+	if logEntry == nil {
+		http.Error(w, "Log not found", 404)
+		return
+	}
+
+	mgr := State.GetManager()
+	if mgr == nil {
+		http.Error(w, "Manager not ready", 503)
+		return
+	}
+
+	mgr.Mu.RLock()
+	localPort, ok := mgr.Tunnels[logEntry.PublicPort]
+	mgr.Mu.RUnlock()
+
+	if !ok {
+
+		http.Error(w, fmt.Sprintf("Tunnel for public port %d not found", logEntry.PublicPort), 404)
+		return
+	}
+
+	targetURL := fmt.Sprintf("http://127.0.0.1:%d", localPort)
+
+	u, err := http.NewRequest(logEntry.Method, logEntry.URL, nil)
+	if err == nil {
+		targetURL += u.URL.Path
+		if u.URL.RawQuery != "" {
+			targetURL += "?" + u.URL.RawQuery
+		}
+	} else {
+
+		if len(logEntry.URL) > 0 && logEntry.URL[0] != '/' {
+			targetURL += "/"
+		}
+		targetURL += logEntry.URL
+	}
+
+	var body io.Reader
+	if logEntry.ReqBody != "" && logEntry.ReqBody != "[Request Body Too Large]" && logEntry.ReqBody != "[Binary Request Body]" {
+		body = strings.NewReader(logEntry.ReqBody)
+	}
+
+	newReq, err := http.NewRequest(logEntry.Method, targetURL, body)
+	if err != nil {
+		http.Error(w, "Failed to create request: "+err.Error(), 500)
+		return
+	}
+
+	for k, v := range logEntry.ReqHeaders {
+
+		newReq.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(newReq)
+	if err != nil {
+		http.Error(w, "Replay failed: "+err.Error(), 502)
+		return
+	}
+	defer resp.Body.Close()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      resp.Status,
+		"status_code": resp.StatusCode,
+		"replayed_to": targetURL,
+	})
 }

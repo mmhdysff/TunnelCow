@@ -142,6 +142,15 @@ func startHTTPSListener() {
 				return
 			}
 
+			if entry.AuthUser != "" {
+				user, pass, ok := r.BasicAuth()
+				if !ok || user != entry.AuthUser || pass != entry.AuthPass {
+					w.Header().Set("WWW-Authenticate", `Basic realm="Restricted Area"`)
+					http.Error(w, "Unauthorized", 401)
+					return
+				}
+			}
+
 			director := func(req *http.Request) {
 				req.URL.Scheme = "http"
 				req.URL.Host = fmt.Sprintf("127.0.0.1:%d", entry.PublicPort)
@@ -171,6 +180,15 @@ func startHTTPSListener() {
 		}
 
 		if entry.Mode == "http" {
+
+			if entry.AuthUser != "" {
+				user, pass, ok := r.BasicAuth()
+				if !ok || user != entry.AuthUser || pass != entry.AuthPass {
+					w.Header().Set("WWW-Authenticate", `Basic realm="Restricted Area"`)
+					http.Error(w, "Unauthorized", 401)
+					return
+				}
+			}
 
 			director := func(req *http.Request) {
 				req.URL.Scheme = "http"
@@ -287,6 +305,7 @@ func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		ResBody:    capturedResBody,
 		DurationMs: duration,
 		ClientIP:   req.RemoteAddr,
+		PublicPort: t.PublicPort,
 	}
 
 	go sendInspectData(t.PublicPort, payload)

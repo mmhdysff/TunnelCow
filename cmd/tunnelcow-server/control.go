@@ -143,7 +143,7 @@ func (c *ClientSession) handleReqDomainMap(payload json.RawMessage) {
 		log.Printf("Invalid REQ_DOMAIN_MAP: %v", err)
 		return
 	}
-	serverDomains.Add(req.Domain, req.PublicPort, req.Mode)
+	serverDomains.Add(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass)
 	if c.Debug {
 		log.Printf("Mapped domain %s -> :%d (Mode: %s)", req.Domain, req.PublicPort, req.Mode)
 	}

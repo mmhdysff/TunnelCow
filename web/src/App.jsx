@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
-import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square, Eye, Search, Code, Clock, LockOpen } from 'lucide-react';
+import { Activity, Plus, Trash2, ArrowUpRight, Zap, Shield, RefreshCw, Server, Globe, AlertCircle, X, CheckSquare, Square, Eye, Search, Code, Clock, LockOpen, Lock, Bell, BellOff, Repeat } from 'lucide-react';
 import clsx from 'clsx';
 import { createPortal } from 'react-dom';
 
@@ -79,7 +79,7 @@ function App() {
   const [status, setStatus] = useState({ connected: false, tunnels: {}, domains: {} });
   const [activeTab, setActiveTab] = useState('tunnels');
   const [newTunnel, setNewTunnel] = useState({ public_port: '', local_port: '', protocol: 'TCP' });
-  const [newDomain, setNewDomain] = useState({ domain: '', target_port: '', mode: 'auto' });
+  const [newDomain, setNewDomain] = useState({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '' });
   const [data, setData] = useState([]);
   const [lastStats, setLastStats] = useState({ up: 0, down: 0, time: Date.now() });
   const [toasts, setToasts] = useState([]);
@@ -88,6 +88,29 @@ function App() {
   const [inspectorLogs, setInspectorLogs] = useState([]);
   const [selectedLogId, setSelectedLogId] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [notificationEnabled, setNotificationEnabled] = useState(() => localStorage.getItem('notificationEnabled') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('notificationEnabled', notificationEnabled);
+  }, [notificationEnabled]);
+
+  const playNotificationSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.15);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+      console.error("Audio error", e);
+    }
+  };
 
 
   const [selectedTunnels, setSelectedTunnels] = useState(new Set());
@@ -95,7 +118,7 @@ function App() {
   useEffect(() => {
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 1000);
+    const interval = setInterval(fetchStatus, 500);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
@@ -181,7 +204,14 @@ function App() {
         const iRes = await fetch(`${API_BASE}/inspect`);
         if (iRes.ok) {
           const logs = await iRes.json();
-          setInspectorLogs(logs.reverse());
+          setInspectorLogs(prev => {
+            if (notificationEnabled && logs.length > prev.length && prev.length > 0) {
+              const newCount = logs.length - prev.length;
+              addToast(`${newCount} new request(s)`, "info");
+              playNotificationSound();
+            }
+            return logs.reverse();
+          });
         }
       }
     } catch (e) {
@@ -332,11 +362,13 @@ function App() {
         body: JSON.stringify({
           domain: newDomain.domain,
           public_port: port,
-          mode: newDomain.mode
+          mode: newDomain.mode,
+          auth_user: newDomain.auth_user,
+          auth_pass: newDomain.auth_pass
         })
       });
       if (!res.ok) throw new Error(await res.text());
-      setNewDomain({ domain: '', target_port: '', mode: 'auto' });
+      setNewDomain({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '' });
       fetchStatus();
       addToast(`Mapped ${newDomain.domain}`, "success");
     } catch (err) {
@@ -363,6 +395,26 @@ function App() {
         }
       }
     });
+  };
+
+  const replayLog = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/replay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast(`Replayed: ${data.status}`, data.status_code >= 400 ? "error" : "success");
+
+        fetchStatus();
+      } else {
+        addToast("Replay failed: " + (data.error || "Unknown error"), "error");
+      }
+    } catch (err) {
+      addToast("Replay network error", "error");
+    }
   };
 
   const int = (s) => parseInt(s, 10);
@@ -652,6 +704,11 @@ function App() {
                           <span className="text-[10px] text-zinc-600 font-bold uppercase">Domain</span>
                           <span className="text-lg font-mono text-white flex items-center gap-2">
                             {domain} <Shield className="w-3 h-3 text-green-500" />
+                            {port && port.auth_user && (
+                              <div className="flex items-center gap-1 text-[10px] text-yellow-500 border border-yellow-900/50 bg-yellow-900/10 px-1.5 rounded">
+                                <Lock className="w-2 h-2" /> Secured
+                              </div>
+                            )}
                           </span>
                         </div>
                         <ArrowUpRight className="text-zinc-800 w-4 h-4" />
@@ -718,6 +775,30 @@ function App() {
                   </select>
                 </div>
 
+                <div className="border-t border-zinc-900 components-separator pt-4 mt-2">
+                  <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-2 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Basic Auth (Optional)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-zinc-800 p-3 text-white placeholder-zinc-800 focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
+                      placeholder="Username"
+                      value={newDomain.auth_user}
+                      onChange={e => setNewDomain({ ...newDomain, auth_user: e.target.value })}
+                      autoComplete="off"
+                    />
+                    <input
+                      type="password"
+                      className="w-full bg-black border border-zinc-800 p-3 text-white placeholder-zinc-800 focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
+                      placeholder="Password"
+                      value={newDomain.auth_pass}
+                      onChange={e => setNewDomain({ ...newDomain, auth_pass: e.target.value })}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">SSL Mode</label>
                   <select
@@ -747,7 +828,26 @@ function App() {
                 <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
                   <Activity className="w-4 h-4" /> Live Requests
                 </h3>
-                <span className="text-[10px] bg-zinc-900 text-zinc-500 px-2 py-1 rounded-full">{inspectorLogs.length} events</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setNotificationEnabled(!notificationEnabled)}
+                    className={clsx(
+                      "p-1.5 rounded-sm transition-colors",
+                      notificationEnabled ? "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20" : "text-zinc-600 hover:text-zinc-400"
+                    )}
+                    title={notificationEnabled ? "Notifications On" : "Notifications Off"}
+                  >
+                    {notificationEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={fetchStatus}
+                    className="p-1.5 text-zinc-600 hover:text-white hover:bg-zinc-800 rounded-sm transition-colors"
+                    title="Refresh List"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                  <span className="text-[10px] bg-zinc-900 text-zinc-500 px-2 py-1 rounded-full">{inspectorLogs.length} events</span>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-900">
                 {inspectorLogs.length === 0 ? (
@@ -804,10 +904,18 @@ function App() {
                             <span>Time: {new Date(log.timestamp).toLocaleString()}</span>
                           </div>
                         </div>
-                        <div className={clsx("text-xl font-bold px-3 py-1 rounded border",
-                          log.status >= 400 ? "border-red-900/50 text-red-500 bg-red-950/10" : "border-green-900/50 text-green-500 bg-green-950/10"
-                        )}>
-                          {log.status}
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => replayLog(log.id)}
+                            className="bg-zinc-900 border border-zinc-700 text-white px-3 py-1 rounded-sm text-xs font-bold uppercase hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                          >
+                            <Repeat className="w-3 h-3" /> Replay
+                          </button>
+                          <div className={clsx("text-xl font-bold px-3 py-1 rounded border",
+                            log.status >= 400 ? "border-red-900/50 text-red-500 bg-red-950/10" : "border-green-900/50 text-green-500 bg-green-950/10"
+                          )}>
+                            {log.status}
+                          </div>
                         </div>
                       </div>
 
