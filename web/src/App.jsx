@@ -505,7 +505,7 @@ function App() {
     <div className="min-h-screen bg-black text-zinc-300 font-mono p-4 md:p-8 relative selection:bg-white selection:text-black">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <BulkDeleteModal isOpen={bulkDeleting} progress={deleteProgress.current} total={deleteProgress.total} />
-      <EditTunnelModal />
+      <EditTunnelModal editTunnel={editTunnel} setEditTunnel={setEditTunnel} handleEditTunnel={handleEditTunnel} />
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
@@ -1178,7 +1178,7 @@ function Toast({ toast, onRemove }) {
   );
 }
 
-const EditTunnelModal = () => {
+const EditTunnelModal = ({ editTunnel, setEditTunnel, handleEditTunnel }) => {
   if (!editTunnel) return null;
 
   return (
