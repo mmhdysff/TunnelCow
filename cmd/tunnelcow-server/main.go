@@ -253,16 +253,38 @@ func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		resBody = []byte(err.Error())
 	}
 
+	capturedReqBody := ""
+	if len(reqBody) > 0 {
+		if len(reqBody) > 4096 {
+			capturedReqBody = "[Request Body Too Large]"
+		} else if isBinary(reqBody) {
+			capturedReqBody = "[Binary Request Body]"
+		} else {
+			capturedReqBody = string(reqBody)
+		}
+	}
+
+	capturedResBody := ""
+	if len(resBody) > 0 {
+		if len(resBody) > 4096 {
+			capturedResBody = "[Response Body Too Large]"
+		} else if isBinary(resBody) {
+			capturedResBody = "[Binary Response Body]"
+		} else {
+			capturedResBody = string(resBody)
+		}
+	}
+
 	payload := tunnel.InspectPayload{
 		ID:         id,
 		Timestamp:  start.UnixMilli(),
 		Method:     req.Method,
 		URL:        req.URL.String(),
 		ReqHeaders: reqHeaders,
-		ReqBody:    string(reqBody),
+		ReqBody:    capturedReqBody,
 		Status:     status,
 		ResHeaders: resHeaders,
-		ResBody:    string(resBody),
+		ResBody:    capturedResBody,
 		DurationMs: duration,
 		ClientIP:   req.RemoteAddr,
 	}
@@ -280,7 +302,11 @@ func sendInspectData(publicPort int, data tunnel.InspectPayload) {
 		return
 	}
 
-	payloadBytes, _ := json.Marshal(data)
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("[INSPECT] JSON Marshal failed: %v", err)
+		return
+	}
 	msg := tunnel.ControlMessage{
 		Type:    tunnel.MsgTypeInspectData,
 		Payload: payloadBytes,
@@ -331,4 +357,16 @@ func handleClient(conn net.Conn, requiredToken string, controlPort int, debug bo
 
 	client := NewClientSession(conn, session, controlStream, controlPort, debug)
 	client.HandleControlLoop()
+}
+
+func isBinary(data []byte) bool {
+	if len(data) > 512 {
+		data = data[:512]
+	}
+	for _, b := range data {
+		if b == 0 {
+			return true
+		}
+	}
+	return false
 }

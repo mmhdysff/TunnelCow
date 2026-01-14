@@ -418,7 +418,7 @@ function App() {
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-zinc-900 pb-6">
           <div className="flex items-center gap-4">
-            <img src="/tunnelcow-ico.svg" alt="TunnelCow Logo" className="w-10 h-10 rounded-sm shadow-[0_0_15px_rgba(255,255,255,0.3)] bg-white p-1" />
+            <img src="/tunnelcow-ico.svg" alt="TunnelCow Logo" className="w-10 h-10 rounded-sm shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white mb-1">TunnelCow</h1>
               <p className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
