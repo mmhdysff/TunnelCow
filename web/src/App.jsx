@@ -353,13 +353,20 @@ function App() {
   const handleEditTunnel = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        public_port: parseInt(editTunnel.original_public_port || editTunnel.public_port),
+        local_port: parseInt(editTunnel.local_port)
+      };
+
+
+      if (editTunnel.original_public_port && parseInt(editTunnel.public_port) !== parseInt(editTunnel.original_public_port)) {
+        payload.new_public_port = parseInt(editTunnel.public_port);
+      }
+
       const res = await fetch(`${API_BASE}/tunnels/edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          public_port: parseInt(editTunnel.public_port),
-          local_port: parseInt(editTunnel.local_port)
-        })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await res.text());
       setEditTunnel(null);
@@ -505,7 +512,7 @@ function App() {
     <div className="min-h-screen bg-black text-zinc-300 font-mono p-4 md:p-8 relative selection:bg-white selection:text-black">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <BulkDeleteModal isOpen={bulkDeleting} progress={deleteProgress.current} total={deleteProgress.total} />
-      <EditTunnelModal editTunnel={editTunnel} setEditTunnel={setEditTunnel} handleEditTunnel={handleEditTunnel} />
+      <EditTunnelModal editTunnel={editTunnel} setEditTunnel={setEditTunnel} handleEditTunnel={handleEditTunnel} status={status} />
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
@@ -675,7 +682,7 @@ function App() {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setEditTunnel({ public_port: pub, local_port: local })}
+                          onClick={() => setEditTunnel({ public_port: pub, local_port: local, original_public_port: pub })}
                           className="p-2 text-zinc-600 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
                           title="Edit Tunnel"
                         >
@@ -1178,8 +1185,13 @@ function Toast({ toast, onRemove }) {
   );
 }
 
-const EditTunnelModal = ({ editTunnel, setEditTunnel, handleEditTunnel }) => {
+const EditTunnelModal = ({ editTunnel, setEditTunnel, handleEditTunnel, status }) => {
   if (!editTunnel) return null;
+
+
+  const isLinkedToDomain = Object.values(status.domains || {}).some(
+    domain => (typeof domain === 'object' ? domain.public_port : domain) === parseInt(editTunnel.public_port)
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -1194,13 +1206,22 @@ const EditTunnelModal = ({ editTunnel, setEditTunnel, handleEditTunnel }) => {
         </div>
         <form onSubmit={handleEditTunnel} className="space-y-4">
           <div>
-            <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Public Port</label>
+            <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">
+              Public Port {isLinkedToDomain && <span className="text-yellow-500">(Linked to Domain)</span>}
+            </label>
             <input
-              type="text"
+              type="number"
               value={editTunnel.public_port}
-              disabled
-              className="w-full bg-zinc-900/50 border border-zinc-800 p-3 text-zinc-500 font-mono text-sm rounded-sm cursor-not-allowed"
+              onChange={e => setEditTunnel({ ...editTunnel, public_port: e.target.value })}
+              disabled={isLinkedToDomain}
+              className={`w-full border p-3 font-mono text-sm rounded-sm ${isLinkedToDomain
+                ? 'bg-zinc-900/50 border-zinc-800 text-zinc-500 cursor-not-allowed'
+                : 'bg-black border-white text-white focus:outline-none'
+                }`}
             />
+            {isLinkedToDomain && (
+              <p className="text-[10px] text-yellow-600 mt-1">Cannot change public port while linked to a domain</p>
+            )}
           </div>
           <div>
             <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Local Port (Target)</label>
@@ -1209,7 +1230,7 @@ const EditTunnelModal = ({ editTunnel, setEditTunnel, handleEditTunnel }) => {
               value={editTunnel.local_port}
               onChange={e => setEditTunnel({ ...editTunnel, local_port: e.target.value })}
               className="w-full bg-black border border-white p-3 text-white font-mono text-sm rounded-sm focus:outline-none"
-              autoFocus
+              autoFocus={!isLinkedToDomain}
             />
           </div>
           <div className="flex gap-2 mt-2">

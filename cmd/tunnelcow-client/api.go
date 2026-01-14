@@ -202,8 +202,9 @@ func (s *APIServer) handleTunnelsEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		PublicPort int `json:"public_port"`
-		LocalPort  int `json:"local_port"`
+		PublicPort    int  `json:"public_port"`
+		LocalPort     int  `json:"local_port"`
+		NewPublicPort *int `json:"new_public_port,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -216,7 +217,7 @@ func (s *APIServer) handleTunnelsEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := mgr.EditTunnel(req.PublicPort, req.LocalPort); err != nil {
+	if err := mgr.EditTunnel(req.PublicPort, req.LocalPort, req.NewPublicPort); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}

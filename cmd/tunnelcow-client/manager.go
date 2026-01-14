@@ -220,12 +220,24 @@ func (m *ClientManager) AddTunnel(publicPort, localPort int) error {
 	return nil
 }
 
-func (m *ClientManager) EditTunnel(publicPort, localPort int) error {
+func (m *ClientManager) EditTunnel(publicPort, localPort int, newPublicPort *int) error {
 	m.Mu.Lock()
 	defer m.Mu.Unlock()
 
 	if _, exists := m.Tunnels[publicPort]; !exists {
 		return fmt.Errorf("public port %d is not active", publicPort)
+	}
+
+	linkedToDomain := false
+	for _, entry := range m.Domains {
+		if entry.PublicPort == publicPort {
+			linkedToDomain = true
+			break
+		}
+	}
+
+	if newPublicPort != nil && *newPublicPort != publicPort && linkedToDomain {
+		return fmt.Errorf("cannot change public port while tunnel is linked to a domain")
 	}
 
 	State.Mu.RLock()
@@ -249,10 +261,53 @@ func (m *ClientManager) EditTunnel(publicPort, localPort int) error {
 		}
 	}
 
-	m.Tunnels[publicPort] = localPort
-	m.saveTunnels()
-	if State.Debug {
-		log.Printf("Edited tunnel: Public :%d is now mapped to Local :%d", publicPort, localPort)
+	if newPublicPort != nil && *newPublicPort != publicPort {
+
+		if newPublicPort == &dashPort {
+			return fmt.Errorf("cannot use dashboard port %d for tunneling", dashPort)
+		}
+		if parts := strings.Split(serverAddr, ":"); len(parts) == 2 {
+			if p, err := strconv.Atoi(parts[1]); err == nil {
+				if *newPublicPort == p {
+					return fmt.Errorf("port %d conflicts with server control port", p)
+				}
+			}
+		}
+		if tcpAddr, ok := m.Control.LocalAddr().(*net.TCPAddr); ok {
+			if *newPublicPort == tcpAddr.Port {
+				return fmt.Errorf("port %d is the active link to server (ephemeral). dangerous to tunnel.", tcpAddr.Port)
+			}
+		}
+		if _, exists := m.Tunnels[*newPublicPort]; exists {
+			return fmt.Errorf("public port %d is already in use", *newPublicPort)
+		}
+
+		m.removeTunnelInternal(publicPort, false)
+
+		req := tunnel.ReqBindPayload{
+			PublicPort: *newPublicPort,
+			LocalPort:  localPort,
+		}
+		msg := tunnel.ControlMessage{
+			Type:    tunnel.MsgTypeReqBind,
+			Payload: mustMarshal(req),
+		}
+		if err := json.NewEncoder(m.Control).Encode(msg); err != nil {
+			return err
+		}
+
+		m.Tunnels[*newPublicPort] = localPort
+		m.saveTunnels()
+		if State.Debug {
+			log.Printf("Edited tunnel: Public port changed from :%d to :%d, now mapped to Local :%d", publicPort, *newPublicPort, localPort)
+		}
+	} else {
+
+		m.Tunnels[publicPort] = localPort
+		m.saveTunnels()
+		if State.Debug {
+			log.Printf("Edited tunnel: Public :%d is now mapped to Local :%d", publicPort, localPort)
+		}
 	}
 	return nil
 }

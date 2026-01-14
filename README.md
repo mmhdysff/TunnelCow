@@ -13,6 +13,8 @@ Basically, it's a tool to expose your local services to the internet using your 
 - **SSL/HTTPS**: Automatically gets Let's Encrypt certificates for your custom domains.
 - **Persistent**: Tunnels stay up and restore after restarts.
 - **Port Ranges**: You can forward a whole range (e.g., 3000-3010) in one go.
+- **Edit Tunnel**: Modify existing tunnel configurations. Change local port anytime, and public port when not linked to a domain.
+- **Security Features**: Basic Auth, Rate Limiting, and Electric Fence (Smart Shield) for domain protection.
 - **Monitoring**: Shows live traffic stats.
 
 ## How to Run
