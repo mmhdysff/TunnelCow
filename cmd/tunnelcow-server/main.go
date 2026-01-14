@@ -140,7 +140,8 @@ func startHTTPSListener(finalToken string) {
 			}
 
 			if entry.RateLimit > 0 {
-				if !GlobalLimiter.Allow(r.RemoteAddr, entry.RateLimit) {
+				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+				if !GlobalLimiter.Allow(ip, entry.RateLimit) {
 					http.Error(w, "Too Many Requests", 429)
 					return
 				}
@@ -188,7 +189,8 @@ func startHTTPSListener(finalToken string) {
 		}
 
 		if entry.RateLimit > 0 {
-			if !GlobalLimiter.Allow(r.RemoteAddr, entry.RateLimit) {
+			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+			if !GlobalLimiter.Allow(ip, entry.RateLimit) {
 				http.Error(w, "Too Many Requests", 429)
 				return
 			}

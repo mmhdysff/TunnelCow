@@ -13,158 +13,223 @@ const loginHTML = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TunnelCow Auth</title>
+    <title>TunnelCow Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #09090b;
-            --card-bg: rgba(24, 24, 27, 0.6);
-            --border-color: rgba(63, 63, 70, 0.4);
-            --text-color: #e4e4e7;
-            --text-muted: #a1a1aa;
-            --primary-color: #fafafa;
-            --primary-bg: #18181b;
-            --error-color: #ef4444;
+            --bg-page: #000000;
+            --bg-card: rgba(24, 24, 27, 0.4);
+            --border: #27272a;
+            --input-bg: rgba(0, 0, 0, 0.6);
+            --primary: #ffffff;
+            --text-main: #f4f4f5;
+            --text-sub: #a1a1aa;
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.15);
         }
+        
         body {
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-page);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-image: radial-gradient(circle at center, #18181b 0%%, #000000 100%%);
+            background-image: 
+                radial-gradient(circle at 50%% 0%%, #18181b 0%%, transparent 70%%),
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 100%% 100%%, 50px 50px, 50px 50px;
         }
-        .container {
-            width: 100%;
-            max-width: 400px;
-            padding: 20px;
+
+        .login-wrapper {
+            width: 100%%;
+            max-width: 380px;
+            padding: 24px;
         }
+
         .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 40px 30px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 40px -10px rgba(0, 0, 0, 0.5);
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
-        .logo {
-            width: 48px;
-            height: 48px;
-            background-color: white;
-            color: black;
-            border-radius: 8px;
-            display: flex;
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        }
+
+        .logo-area {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 20px;
-            font-weight: 900;
-            font-size: 24px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #3f3f46, #18181b);
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
         }
+
+        .logo-icon {
+            color: white;
+        }
+
         h1 {
             font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-color);
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            margin: 0 0 8px 0;
+            color: white;
         }
-        p {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 30px;
-            margin-top: 0;
+
+        p.subtitle {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin: 0 0 32px 0;
+            line-height: 1.5;
         }
+
+        .domain-tag {
+            display: inline-block;
+            background: #27272a;
+            color: #e4e4e7;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            margin-top: 4px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
         .form-group {
             margin-bottom: 16px;
             text-align: left;
         }
+
         label {
             display: block;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 6px;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 8px;
         }
+
         input {
-            width: 100%;
-            padding: 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
+            width: 100%%;
+            padding: 12px 14px;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
             color: white;
             font-size: 14px;
+            font-family: 'Inter', sans-serif;
             box-sizing: border-box;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
         }
+
         input:focus {
             outline: none;
-            border-color: var(--text-muted);
+            border-color: #52525b;
+            background: rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
         }
+
         button {
-            width: 100%;
+            width: 100%%;
             padding: 12px;
-            background: var(--primary-color);
+            background: white;
             color: black;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity 0.2s;
-            margin-top: 10px;
+            transition: all 0.2s;
+            margin-top: 12px;
         }
+
         button:hover {
-            opacity: 0.9;
+            background: #e4e4e7;
+            transform: translateY(-1px);
         }
-        .error {
-            background-color: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            color: var(--error-color);
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error-msg {
+            background: var(--danger-bg);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
             font-size: 13px;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+
         .footer {
-            margin-top: 30px;
+            margin-top: 32px;
             font-size: 12px;
             color: #52525b;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="login-wrapper">
         <div class="card">
-            <div class="logo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            <div class="logo-area">
+                <svg class="logo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
             </div>
-            <h1>Restricted Access</h1>
-            <p>Please authenticate to access %s</p>
+            <h1>Restricted Area</h1>
+            <p class="subtitle">
+                Authentication required for <br>
+                <span class="domain-tag">%s</span>
+            </p>
 
             %s
 
             <form method="POST">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" name="username" required autocomplete="off" autofocus>
+                    <input type="text" name="username" required autocomplete="off" autofocus placeholder="Enter username">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" name="password" required>
+                    <input type="password" name="password" required placeholder="Enter password">
                 </div>
-                <button type="submit">Enter Tunnel</button>
+                <button type="submit">Unlock Access</button>
             </form>
             
             <div class="footer">
-                Secured by TunnelCow
+                Powered by TunnelCow
             </div>
         </div>
     </div>
