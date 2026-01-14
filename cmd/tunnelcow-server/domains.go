@@ -11,6 +11,7 @@ type DomainEntry struct {
 	Mode       string `json:"mode"`
 	AuthUser   string `json:"auth_user,omitempty"`
 	AuthPass   string `json:"auth_pass,omitempty"`
+	RateLimit  int    `json:"rate_limit,omitempty"`
 }
 
 type DomainManager struct {
@@ -45,7 +46,7 @@ func (dm *DomainManager) save() {
 	os.WriteFile(dm.File, data, 0644)
 }
 
-func (dm *DomainManager) Add(domain string, port int, mode string, authUser, authPass string) {
+func (dm *DomainManager) Add(domain string, port int, mode string, authUser, authPass string, rateLimit int) {
 	dm.Mu.Lock()
 	defer dm.Mu.Unlock()
 	if mode == "" {
@@ -56,6 +57,7 @@ func (dm *DomainManager) Add(domain string, port int, mode string, authUser, aut
 		Mode:       mode,
 		AuthUser:   authUser,
 		AuthPass:   authPass,
+		RateLimit:  rateLimit,
 	}
 	dm.save()
 }

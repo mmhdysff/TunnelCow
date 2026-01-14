@@ -209,13 +209,14 @@ func (s *APIServer) handleDomains(w http.ResponseWriter, r *http.Request) {
 			Mode       string `json:"mode"`
 			AuthUser   string `json:"auth_user"`
 			AuthPass   string `json:"auth_pass"`
+			RateLimit  int    `json:"rate_limit"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
 
-		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass); err != nil {
+		if err := mgr.AddDomain(req.Domain, req.PublicPort, req.Mode, req.AuthUser, req.AuthPass, req.RateLimit); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

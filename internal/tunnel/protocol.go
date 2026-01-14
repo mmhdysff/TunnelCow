@@ -31,6 +31,7 @@ type ReqDomainMapPayload struct {
 	Mode       string `json:"mode"`
 	AuthUser   string `json:"auth_user,omitempty"`
 	AuthPass   string `json:"auth_pass,omitempty"`
+	RateLimit  int    `json:"rate_limit,omitempty"`
 }
 
 type ReqDomainUnmapPayload struct {

@@ -79,7 +79,7 @@ function App() {
   const [status, setStatus] = useState({ connected: false, tunnels: {}, domains: {} });
   const [activeTab, setActiveTab] = useState('tunnels');
   const [newTunnel, setNewTunnel] = useState({ public_port: '', local_port: '', protocol: 'TCP' });
-  const [newDomain, setNewDomain] = useState({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '' });
+  const [newDomain, setNewDomain] = useState({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '', rate_limit: 0 });
   const [data, setData] = useState([]);
   const [lastStats, setLastStats] = useState({ up: 0, down: 0, time: Date.now() });
   const [toasts, setToasts] = useState([]);
@@ -363,12 +363,14 @@ function App() {
           domain: newDomain.domain,
           public_port: port,
           mode: newDomain.mode,
+          mode: newDomain.mode,
           auth_user: newDomain.auth_user,
-          auth_pass: newDomain.auth_pass
+          auth_pass: newDomain.auth_pass,
+          rate_limit: parseInt(newDomain.rate_limit) || 0
         })
       });
       if (!res.ok) throw new Error(await res.text());
-      setNewDomain({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '' });
+      setNewDomain({ domain: '', target_port: '', mode: 'auto', auth_user: '', auth_pass: '', rate_limit: 0 });
       fetchStatus();
       addToast(`Mapped ${newDomain.domain}`, "success");
     } catch (err) {
@@ -709,6 +711,11 @@ function App() {
                                 <Lock className="w-2 h-2" /> Secured
                               </div>
                             )}
+                            {port && port.rate_limit > 0 && (
+                              <div className="flex items-center gap-1 text-[10px] text-blue-500 border border-blue-900/50 bg-blue-900/10 px-1.5 rounded">
+                                <Zap className="w-2 h-2" /> {port.rate_limit} r/s
+                              </div>
+                            )}
                           </span>
                         </div>
                         <ArrowUpRight className="text-zinc-800 w-4 h-4" />
@@ -797,6 +804,21 @@ function App() {
                       autoComplete="new-password"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase text-zinc-600 font-bold mb-1 flex items-center gap-1">
+                    <Zap className="w-3 h-3" /> Rate Limit (Requests/sec)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full bg-black border border-zinc-800 p-3 text-white placeholder-zinc-800 focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
+                    placeholder="0 (Unlimited)"
+                    value={newDomain.rate_limit || ''}
+                    onChange={e => setNewDomain({ ...newDomain, rate_limit: e.target.value })}
+                  />
+                  <p className="text-[10px] text-zinc-600 mt-1">* 0 means no limit. Protection against abuse.</p>
                 </div>
 
                 <div>

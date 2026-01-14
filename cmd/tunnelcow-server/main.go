@@ -92,7 +92,9 @@ func main() {
 
 	initDomainManager()
 
-	go startHTTPSListener()
+	go GlobalLimiter.CleanupLoop()
+
+	go startHTTPSListener(finalToken)
 
 	for {
 		conn, err := ln.Accept()
@@ -107,7 +109,7 @@ func main() {
 	}
 }
 
-func startHTTPSListener() {
+func startHTTPSListener(finalToken string) {
 
 	m := &autocert.Manager{
 		Cache:  autocert.DirCache("certs"),
@@ -137,16 +139,22 @@ func startHTTPSListener() {
 				return
 			}
 
+			if entry.RateLimit > 0 {
+				if !GlobalLimiter.Allow(r.RemoteAddr, entry.RateLimit) {
+					http.Error(w, "Too Many Requests", 429)
+					return
+				}
+			}
+
 			if entry.Mode == "http" {
 				http.Error(w, "HTTPS not enabled for this domain", 403)
 				return
 			}
 
 			if entry.AuthUser != "" {
-				user, pass, ok := r.BasicAuth()
-				if !ok || user != entry.AuthUser || pass != entry.AuthPass {
-					w.Header().Set("WWW-Authenticate", `Basic realm="Restricted Area"`)
-					http.Error(w, "Unauthorized", 401)
+				valid := validateCookie(r, host, entry.AuthUser, entry.AuthPass, finalToken)
+				if !valid {
+					serveLogin(w, r, host, entry.AuthUser, entry.AuthPass, finalToken)
 					return
 				}
 			}
@@ -179,13 +187,19 @@ func startHTTPSListener() {
 			return
 		}
 
+		if entry.RateLimit > 0 {
+			if !GlobalLimiter.Allow(r.RemoteAddr, entry.RateLimit) {
+				http.Error(w, "Too Many Requests", 429)
+				return
+			}
+		}
+
 		if entry.Mode == "http" {
 
 			if entry.AuthUser != "" {
-				user, pass, ok := r.BasicAuth()
-				if !ok || user != entry.AuthUser || pass != entry.AuthPass {
-					w.Header().Set("WWW-Authenticate", `Basic realm="Restricted Area"`)
-					http.Error(w, "Unauthorized", 401)
+				valid := validateCookie(r, host, entry.AuthUser, entry.AuthPass, finalToken)
+				if !valid {
+					serveLogin(w, r, host, entry.AuthUser, entry.AuthPass, finalToken)
 					return
 				}
 			}
@@ -227,6 +241,29 @@ func startHTTPSListener() {
 	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.Printf("TLS Server failed: %v (Proceeding with Control Server only)", err)
 	}
+}
+
+func serveLogin(w http.ResponseWriter, r *http.Request, domain, user, pass, secret string) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		u := r.FormValue("username")
+		p := r.FormValue("password")
+
+		if u == user && p == pass {
+			cookie := generateCookie(domain, user, pass, secret)
+			http.SetCookie(w, cookie)
+			http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
+			return
+		}
+
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, loginHTML, domain, `<div class="error">Invalid username or password</div>`)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusUnauthorized)
+	fmt.Fprintf(w, loginHTML, domain, "")
 }
 
 type CaptureTransport struct {
