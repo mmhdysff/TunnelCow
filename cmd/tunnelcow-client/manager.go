@@ -282,17 +282,28 @@ func (m *ClientManager) EditTunnel(publicPort, localPort int, newPublicPort *int
 			return fmt.Errorf("public port %d is already in use", *newPublicPort)
 		}
 
-		m.removeTunnelInternal(publicPort, false)
+		unbindReq := tunnel.ReqUnbindPayload{
+			PublicPort: publicPort,
+		}
+		unbindMsg := tunnel.ControlMessage{
+			Type:    tunnel.MsgTypeReqUnbind,
+			Payload: mustMarshal(unbindReq),
+		}
+		if err := json.NewEncoder(m.Control).Encode(unbindMsg); err != nil {
+			log.Printf("Failed to send UNBIND for %d: %v", publicPort, err)
+		}
 
-		req := tunnel.ReqBindPayload{
+		delete(m.Tunnels, publicPort)
+
+		bindReq := tunnel.ReqBindPayload{
 			PublicPort: *newPublicPort,
 			LocalPort:  localPort,
 		}
-		msg := tunnel.ControlMessage{
+		bindMsg := tunnel.ControlMessage{
 			Type:    tunnel.MsgTypeReqBind,
-			Payload: mustMarshal(req),
+			Payload: mustMarshal(bindReq),
 		}
-		if err := json.NewEncoder(m.Control).Encode(msg); err != nil {
+		if err := json.NewEncoder(m.Control).Encode(bindMsg); err != nil {
 			return err
 		}
 
