@@ -264,7 +264,10 @@ func connectAndServe(cfg *tunnel.Config) error {
 
 	ui.Info("Connected to server!")
 
-	manager := NewClientManager(control, session)
+	State.Mu.RLock()
+	dbg := State.Debug
+	State.Mu.RUnlock()
+	manager := NewClientManager(control, session, dbg)
 	State.SetManager(manager)
 
 	go manager.RestoreTunnels()

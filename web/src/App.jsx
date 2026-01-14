@@ -379,7 +379,7 @@ function App() {
         <ToastContainer toasts={toasts} removeToast={removeToast} />
         <div className="w-full max-w-sm border border-zinc-900 bg-zinc-950/50 p-8 rounded-sm shadow-2xl">
           <div className="flex justify-center mb-6">
-            <div className="w-12 h-12 bg-white text-black flex items-center justify-center font-bold text-xl rounded-sm">T</div>
+            <img src="/tunnelcow-ico.svg" alt="TunnelCow Logo" className="w-16 h-16 rounded-sm shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
           </div>
           <h2 className="text-center text-xl font-bold text-white mb-8 tracking-tight">TunnelCow Access</h2>
           <form onSubmit={login} className="space-y-4">

@@ -34,14 +34,16 @@ type ClientManager struct {
 	Tunnels map[int]int
 	Domains map[string]ClientDomainEntry
 	Mu      sync.RWMutex
+	Debug   bool
 }
 
-func NewClientManager(control net.Conn, session *yamux.Session) *ClientManager {
+func NewClientManager(control net.Conn, session *yamux.Session, debug bool) *ClientManager {
 	return &ClientManager{
 		Control: control,
 		Session: session,
 		Tunnels: make(map[int]int),
 		Domains: make(map[string]ClientDomainEntry),
+		Debug:   debug,
 	}
 }
 
@@ -450,7 +452,9 @@ func (c *ClientManager) handleInspectData(payload json.RawMessage) {
 		return
 	}
 
-	log.Printf("[INSPECT] Received data for URL: %s", data.URL)
+	if c.Debug {
+		log.Printf("[INSPECT] Received data for URL: %s", data.URL)
+	}
 
 	InspectLogsMu.Lock()
 	defer InspectLogsMu.Unlock()
