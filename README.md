@@ -5,7 +5,7 @@ A self-hosted tunneling solution I built to manage multiple port forwards easily
 
 Basically, it's a tool to expose your local services to the internet using your own VPS.
 
-![Version](https://img.shields.io/badge/version-v0.1.16-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-v0.1.17-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 
