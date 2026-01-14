@@ -541,7 +541,7 @@ function App() {
               <p className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                 Yet Another Tunneling Manager
                 <span className="w-1 h-1 bg-zinc-700 rounded-full"></span>
-                v0.1.22
+                v0.1.23
               </p>
             </div>
           </div>
