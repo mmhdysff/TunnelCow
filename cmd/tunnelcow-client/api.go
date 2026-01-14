@@ -210,9 +210,9 @@ func (s *APIServer) handleTunnelsEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mgr := s.Manager
-	if mgr == nil {
-		http.Error(w, "Manager not initialized", 503)
+	mgr := State.GetManager()
+	if mgr == nil || !State.IsConnected() {
+		http.Error(w, "MANAGER NOT INITIALIZED", 503)
 		return
 	}
 
