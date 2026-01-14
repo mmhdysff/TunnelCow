@@ -354,7 +354,6 @@ func (m *ClientManager) AddRange(publicStr, localStr string) error {
 
 func (m *ClientManager) removeTunnelInternal(publicPort int, save bool) {
 	m.Mu.Lock()
-	defer m.Mu.Unlock()
 
 	req := tunnel.ReqUnbindPayload{
 		PublicPort: publicPort,
@@ -373,6 +372,13 @@ func (m *ClientManager) removeTunnelInternal(publicPort int, save bool) {
 			orphanedDomains = append(orphanedDomains, d)
 		}
 	}
+
+	delete(m.Tunnels, publicPort)
+	if save {
+		m.saveTunnels()
+	}
+	m.Mu.Unlock()
+
 	for _, d := range orphanedDomains {
 		if err := m.RemoveDomain(d); err != nil {
 			log.Printf("Failed to unmap orphan domain %s: %v", d, err)
@@ -381,10 +387,6 @@ func (m *ClientManager) removeTunnelInternal(publicPort int, save bool) {
 		}
 	}
 
-	delete(m.Tunnels, publicPort)
-	if save {
-		m.saveTunnels()
-	}
 	State.Mu.RLock()
 	debug := State.Debug
 	State.Mu.RUnlock()

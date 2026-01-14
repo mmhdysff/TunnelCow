@@ -353,14 +353,18 @@ function App() {
   const handleEditTunnel = async (e) => {
     e.preventDefault();
     try {
+      const originalPort = parseInt(editTunnel.original_public_port || editTunnel.public_port);
+      const currentPort = parseInt(editTunnel.public_port);
+      const localPort = parseInt(editTunnel.local_port);
+
       const payload = {
-        public_port: parseInt(editTunnel.original_public_port || editTunnel.public_port),
-        local_port: parseInt(editTunnel.local_port)
+        public_port: originalPort,
+        local_port: localPort
       };
 
 
-      if (editTunnel.original_public_port && parseInt(editTunnel.public_port) !== parseInt(editTunnel.original_public_port)) {
-        payload.new_public_port = parseInt(editTunnel.public_port);
+      if (originalPort !== currentPort) {
+        payload.new_public_port = currentPort;
       }
 
       const res = await fetch(`${API_BASE}/tunnels/edit`, {
@@ -368,12 +372,17 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
       setEditTunnel(null);
-      fetchStatus();
-      addToast(`Updated tunnel :${editTunnel.public_port}`, "success");
+      await fetchStatus();
+      addToast(`Updated tunnel successfully`, "success");
     } catch (err) {
-      addToast(err.message, "error");
+      addToast(err.message || "Failed to update tunnel", "error");
     }
   };
 
@@ -846,6 +855,22 @@ function App() {
                     readOnly={isEditMode}
                   />
                   {isEditMode && <p className="text-[10px] text-zinc-600 mt-1">* Domain name cannot be changed</p>}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">Target Tunnel (Port)</label>
+                  <select
+                    className="w-full bg-black border border-zinc-800 p-3 text-white focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
+                    value={newDomain.target_port}
+                    onChange={e => setNewDomain({ ...newDomain, target_port: e.target.value })}
+                  >
+                    <option value="">Select a tunnel...</option>
+                    {tunnelsArr.map(([pub, local]) => (
+                      <option key={pub} value={pub}>
+                        :{pub} → :{local}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="border-t border-zinc-900 components-separator pt-4 mt-2">
