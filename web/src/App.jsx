@@ -505,6 +505,7 @@ function App() {
     <div className="min-h-screen bg-black text-zinc-300 font-mono p-4 md:p-8 relative selection:bg-white selection:text-black">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <BulkDeleteModal isOpen={bulkDeleting} progress={deleteProgress.current} total={deleteProgress.total} />
+      <EditTunnelModal />
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
@@ -817,37 +818,27 @@ function App() {
 
             {/* Config Form */}
             <div className="border border-zinc-900 bg-zinc-950/30 rounded-sm p-6 h-fit sticky top-6">
-              <h3 className="text-xs font-bold text-zinc-500 uppercase mb-4 flex items-center gap-2">
-                <Plus className="w-4 h-4" /> New Domain Map
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                  {isEditMode ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  {isEditMode ? 'Edit Domain' : 'New Domain Map'}
+                </h3>
+                {isEditMode && (
+                  <button onClick={resetDomainForm} className="text-[10px] text-zinc-500 hover:text-white uppercase font-bold">Cancel</button>
+                )}
+              </div>
               <form onSubmit={addDomain} className="space-y-4">
                 <div>
                   <label className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">Domain Name</label>
                   <input
                     type="text"
-                    className="w-full bg-black border border-zinc-800 p-3 text-white placeholder-zinc-800 focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
+                    className={`w-full bg-black border border-zinc-800 p-3 text-white placeholder-zinc-800 focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder="e.g. app.myserver.com"
                     value={newDomain.domain}
                     onChange={e => setNewDomain({ ...newDomain, domain: e.target.value })}
+                    readOnly={isEditMode}
                   />
-                  <p className="text-[10px] text-zinc-600 mt-1">
-                    * Make sure A Record points to {status.server_addr?.split(':')[0] || 'Server IP'}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase text-zinc-600 font-bold mb-1">Target Tunnel (Public Port)</label>
-                  <select
-                    className="w-full bg-black border border-zinc-800 p-3 text-white focus:outline-none focus:border-white transition-colors font-mono text-sm rounded-sm"
-                    value={newDomain.target_port}
-                    onChange={e => setNewDomain({ ...newDomain, target_port: e.target.value })}
-                  >
-                    <option value="">-- Select Tunnel --</option>
-                    {tunnelsArr.map(([pub, local]) => (
-                      <option key={pub} value={pub}>
-                        :{pub} (Local :{local})
-                      </option>
-                    ))}
-                  </select>
+                  {isEditMode && <p className="text-[10px] text-zinc-600 mt-1">* Domain name cannot be changed</p>}
                 </div>
 
                 <div className="border-t border-zinc-900 components-separator pt-4 mt-2">
@@ -1186,6 +1177,61 @@ function Toast({ toast, onRemove }) {
     </div>
   );
 }
+
+const EditTunnelModal = () => {
+  if (!editTunnel) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-[#09090b] border border-zinc-800 p-6 rounded-lg w-full max-w-sm shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-sm font-bold text-white uppercase flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-zinc-500" /> Edit Tunnel
+          </h3>
+          <button onClick={() => setEditTunnel(null)} className="text-zinc-500 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleEditTunnel} className="space-y-4">
+          <div>
+            <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Public Port</label>
+            <input
+              type="text"
+              value={editTunnel.public_port}
+              disabled
+              className="w-full bg-zinc-900/50 border border-zinc-800 p-3 text-zinc-500 font-mono text-sm rounded-sm cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Local Port (Target)</label>
+            <input
+              type="number"
+              value={editTunnel.local_port}
+              onChange={e => setEditTunnel({ ...editTunnel, local_port: e.target.value })}
+              className="w-full bg-black border border-white p-3 text-white font-mono text-sm rounded-sm focus:outline-none"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => setEditTunnel(null)}
+              className="flex-1 bg-zinc-900 text-zinc-400 py-2.5 text-xs font-bold uppercase rounded-sm hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-white text-black py-2.5 text-xs font-bold uppercase rounded-sm hover:bg-zinc-200"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 export default App;
 
