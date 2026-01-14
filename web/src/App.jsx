@@ -796,6 +796,13 @@ function App() {
                         </div>
                       </div>
                       <button
+                        onClick={() => handleEditDomain(domain, port)}
+                        className="p-2 text-zinc-600 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
+                        title="Edit Domain"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => deleteDomain(domain)}
                         className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-950/30 rounded-full transition-all"
                         title="Unmap Domain"
