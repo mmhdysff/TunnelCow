@@ -363,7 +363,6 @@ function App() {
           domain: newDomain.domain,
           public_port: port,
           mode: newDomain.mode,
-          mode: newDomain.mode,
           auth_user: newDomain.auth_user,
           auth_pass: newDomain.auth_pass,
           rate_limit: parseInt(newDomain.rate_limit) || 0,

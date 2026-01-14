@@ -60,11 +60,13 @@ func (m *ClientManager) AddDomain(domain string, publicPort int, mode string, au
 	}
 
 	req := tunnel.ReqDomainMapPayload{
-		Domain:     domain,
-		PublicPort: publicPort,
-		Mode:       mode,
-		AuthUser:   authUser,
-		AuthPass:   authPass,
+		Domain:      domain,
+		PublicPort:  publicPort,
+		Mode:        mode,
+		AuthUser:    authUser,
+		AuthPass:    authPass,
+		RateLimit:   rateLimit,
+		SmartShield: smartShield,
 	}
 
 	msg := tunnel.ControlMessage{
