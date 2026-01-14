@@ -47,6 +47,32 @@ const BulkDeleteModal = ({ isOpen, progress, total }) => {
   );
 };
 
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-sm shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+        <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">{title}</h3>
+        <p className="text-zinc-400 text-sm mb-6">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-bold uppercase text-zinc-500 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose(); }}
+            className="px-4 py-2 text-xs font-bold uppercase bg-red-600 text-white hover:bg-red-700 transition-colors rounded-sm"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -61,6 +87,7 @@ function App() {
   const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 });
   const [inspectorLogs, setInspectorLogs] = useState([]);
   const [selectedLogId, setSelectedLogId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
 
   const [selectedTunnels, setSelectedTunnels] = useState(new Set());
@@ -205,23 +232,29 @@ function App() {
     }
   };
 
-  const deleteTunnel = async (publicPort) => {
-    try {
-      await fetch(`${API_BASE}/tunnels`, {
-        method: 'DELETE',
-        body: JSON.stringify({ public_port: int(publicPort) })
-      });
-      fetchStatus();
-
-      if (selectedTunnels.has(publicPort.toString())) {
-        const next = new Set(selectedTunnels);
-        next.delete(publicPort.toString());
-        setSelectedTunnels(next);
+  const deleteTunnel = (publicPort) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Stop Tunnel?',
+      message: `This will close the tunnel on port :${publicPort}. Are you sure?`,
+      onConfirm: async () => {
+        try {
+          await fetch(`${API_BASE}/tunnels`, {
+            method: 'DELETE',
+            body: JSON.stringify({ public_port: int(publicPort) })
+          });
+          fetchStatus();
+          if (selectedTunnels.has(publicPort.toString())) {
+            const next = new Set(selectedTunnels);
+            next.delete(publicPort.toString());
+            setSelectedTunnels(next);
+          }
+          addToast(`Tunnel :${publicPort} closed`, "success");
+        } catch (err) {
+          addToast("Failed to close tunnel", "error");
+        }
       }
-      addToast(`Tunnel :${publicPort} closed`, "success");
-    } catch (err) {
-      addToast("Failed to close tunnel", "error");
-    }
+    });
   };
 
   const toggleSelect = (pub) => {
@@ -240,46 +273,49 @@ function App() {
     }
   }
 
-  const deleteSelected = async () => {
+  const deleteSelected = () => {
     const total = selectedTunnels.size;
-    if (!confirm(`Stop ${total} tunnels?`)) return;
 
-    setBulkDeleting(true);
-    setDeleteProgress({ current: 0, total });
+    setConfirmModal({
+      isOpen: true,
+      title: 'Stop Selected Tunnels?',
+      message: `You are about to stop ${total} tunnels. This action cannot be undone.`,
+      onConfirm: async () => {
+        setBulkDeleting(true);
+        setDeleteProgress({ current: 0, total });
 
-    const allPorts = Array.from(selectedTunnels).map(p => parseInt(p, 10));
-    const CHUNK_SIZE = 50;
-    let processed = 0;
+        const allPorts = Array.from(selectedTunnels).map(p => parseInt(p, 10));
+        const CHUNK_SIZE = 50;
+        let processed = 0;
 
-    try {
+        try {
+          for (let i = 0; i < allPorts.length; i += CHUNK_SIZE) {
+            const chunk = allPorts.slice(i, i + CHUNK_SIZE);
 
-      for (let i = 0; i < allPorts.length; i += CHUNK_SIZE) {
-        const chunk = allPorts.slice(i, i + CHUNK_SIZE);
+            await fetch(`${API_BASE}/tunnels`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ public_ports: chunk })
+            });
 
-        await fetch(`${API_BASE}/tunnels`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ public_ports: chunk })
-        });
+            processed += chunk.length;
+            setDeleteProgress({ current: processed, total });
+            await new Promise(r => setTimeout(r, 50));
+          }
 
-        processed += chunk.length;
-        setDeleteProgress({ current: processed, total });
-
-
-        await new Promise(r => setTimeout(r, 50));
+          addToast(`STOPPED ${total} TUNNELS`, "success");
+          setSelectedTunnels(new Set());
+          fetchStatus();
+        } catch (err) {
+          console.error(err);
+          addToast("FAILED TO STOP SOME TUNNELS", "error");
+        } finally {
+          setTimeout(() => {
+            setBulkDeleting(false);
+          }, 500);
+        }
       }
-
-      addToast(`STOPPED ${total} TUNNELS`, "success");
-      setSelectedTunnels(new Set());
-      fetchStatus();
-    } catch (err) {
-      console.error(err);
-      addToast("FAILED TO STOP SOME TUNNELS", "error");
-    } finally {
-      setTimeout(() => {
-        setBulkDeleting(false);
-      }, 500);
-    }
+    });
   }
 
   const addDomain = async (e) => {
@@ -308,18 +344,25 @@ function App() {
     }
   };
 
-  const deleteDomain = async (domain) => {
-    try {
-      await fetch(`${API_BASE}/domains`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain })
-      });
-      fetchStatus();
-      addToast(`Unmapped ${domain}`, "success");
-    } catch (err) {
-      addToast("Failed to unmap domain", "error");
-    }
+  const deleteDomain = (domain) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Unmap Domain?',
+      message: `This will remove the mapping for ${domain}. It will no longer point to your tunnel.`,
+      onConfirm: async () => {
+        try {
+          await fetch(`${API_BASE}/domains`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain })
+          });
+          fetchStatus();
+          addToast(`Unmapped ${domain}`, "success");
+        } catch (err) {
+          addToast("Failed to unmap domain", "error");
+        }
+      }
+    });
   };
 
   const int = (s) => parseInt(s, 10);
@@ -362,15 +405,20 @@ function App() {
     <div className="min-h-screen bg-black text-zinc-300 font-mono p-4 md:p-8 relative selection:bg-white selection:text-black">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <BulkDeleteModal isOpen={bulkDeleting} progress={deleteProgress.current} total={deleteProgress.total} />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+      />
 
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-zinc-900 pb-6">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-white text-black flex items-center justify-center font-bold text-lg rounded-sm shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-              T
-            </div>
+            <img src="/tunnelcow-ico.svg" alt="TunnelCow Logo" className="w-10 h-10 rounded-sm shadow-[0_0_15px_rgba(255,255,255,0.3)] bg-white p-1" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white mb-1">TunnelCow</h1>
               <p className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">

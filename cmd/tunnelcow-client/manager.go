@@ -242,6 +242,20 @@ func (m *ClientManager) removeTunnelInternal(publicPort int, save bool) {
 		log.Printf("Failed to send UNBIND for %d: %v", publicPort, err)
 	}
 
+	var orphanedDomains []string
+	for d, e := range m.Domains {
+		if e.PublicPort == publicPort {
+			orphanedDomains = append(orphanedDomains, d)
+		}
+	}
+	for _, d := range orphanedDomains {
+		if err := m.RemoveDomain(d); err != nil {
+			log.Printf("Failed to unmap orphan domain %s: %v", d, err)
+		} else {
+			log.Printf("Removed orphan domain %s linked to port %d", d, publicPort)
+		}
+	}
+
 	delete(m.Tunnels, publicPort)
 	if save {
 		m.saveTunnels()
@@ -435,6 +449,8 @@ func (c *ClientManager) handleInspectData(payload json.RawMessage) {
 		log.Printf("Invalid INSPECT_DATA: %v", err)
 		return
 	}
+
+	log.Printf("[INSPECT] Received data for URL: %s", data.URL)
 
 	InspectLogsMu.Lock()
 	defer InspectLogsMu.Unlock()

@@ -273,8 +273,10 @@ func (t *CaptureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 }
 
 func sendInspectData(publicPort int, data tunnel.InspectPayload) {
+	log.Printf("[INSPECT] Sending inspection data for port %d (URL: %s)", publicPort, data.URL)
 	session, ok := GlobalSessions.Get(publicPort)
 	if !ok {
+		log.Printf("[INSPECT] Failed to find session for port %d", publicPort)
 		return
 	}
 
@@ -287,7 +289,11 @@ func sendInspectData(publicPort int, data tunnel.InspectPayload) {
 	session.Mu.Lock()
 	defer session.Mu.Unlock()
 
-	json.NewEncoder(session.Control).Encode(msg)
+	if err := json.NewEncoder(session.Control).Encode(msg); err != nil {
+		log.Printf("[INSPECT] Failed to encode/send message: %v", err)
+	} else {
+		log.Printf("[INSPECT] Sent %d bytes to client", len(payloadBytes))
+	}
 }
 
 func handleClient(conn net.Conn, requiredToken string, controlPort int, debug bool) {
